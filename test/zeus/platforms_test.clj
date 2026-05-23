@@ -20,3 +20,13 @@
 (deftest platform-folders
   (is (= "psvita" (p/platform-folders :psv)))
   (is (= "ps3" (p/platform-folders :ps3))))
+
+(deftest platform-from-source
+  (testing "maps content type back to platform"
+    (is (= :ps3 (p/platform-from-source :ps3_games)))
+    (is (= :ps3 (p/platform-from-source :ps3_dlcs)))
+    (is (= :psv (p/platform-from-source :psv_dlcs)))
+    (is (= :psp (p/platform-from-source :psp_games))))
+  (testing "unknown source returns :unknown"
+    (is (= :unknown (p/platform-from-source :nothing)))
+    (is (= :unknown (p/platform-from-source nil)))))

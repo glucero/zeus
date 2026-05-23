@@ -18,3 +18,8 @@
    :psp "psp"
    :psx "psx"
    :psm "psm"})
+
+(defn platform-from-source [source]
+  (or (some (fn [[plat types]] (when (some #{source} types) plat))
+            platforms)
+      :unknown))

@@ -1,0 +1,8 @@
+{:paths ["src" "test"]
+ :deps {}
+ :tasks
+ {test {:doc "Run all tests"
+        :requires ([clojure.test :as t])
+        :task (let [{:keys [fail error]}
+                    (t/run-all-tests (re-pattern "zeus\\..*-test"))]
+                (System/exit (if (zero? (+ fail error)) 0 1)))}}}

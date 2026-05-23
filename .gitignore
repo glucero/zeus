@@ -1,0 +1,6 @@
+cache/
+downloads/
+.cpcache/
+.clj-kondo/
+.lsp/
+*.log

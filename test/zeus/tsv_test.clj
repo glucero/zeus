@@ -44,3 +44,42 @@
       (is (= "Game A" (get row "Name")))
       (is (= "US" (get row "Region")))
       (is (nil? (get row "Title ID"))))))
+
+(defn- temp-dir []
+  (doto (java.io.File/createTempFile "zeus-cache" "")
+    (.delete) (.mkdir) (.deleteOnExit)))
+
+(deftest download-tsv
+  (testing "downloads and writes when cache is missing"
+    (let [dir (temp-dir)
+          cache-file (io/file dir "x.tsv")
+          calls (atom 0)]
+      (with-redefs [tsv/fetch-bytes (fn [_] (swap! calls inc)
+                                      (.getBytes "header\nrow1\n"))]
+        (let [out (tsv/download-tsv {:url "http://x"
+                                     :cache-file cache-file
+                                     :expiration-days 7
+                                     :force? false})]
+          (is (= cache-file out))
+          (is (= 1 @calls))
+          (is (= "header\nrow1\n" (slurp out)))))))
+  (testing "skips fetch when cache is fresh"
+    (let [dir (temp-dir)
+          cache-file (io/file dir "x.tsv")
+          _ (spit cache-file "cached body")
+          calls (atom 0)]
+      (with-redefs [tsv/fetch-bytes (fn [_] (swap! calls inc) (byte-array 0))]
+        (tsv/download-tsv {:url "http://x" :cache-file cache-file
+                           :expiration-days 7 :force? false})
+        (is (zero? @calls))
+        (is (= "cached body" (slurp cache-file))))))
+  (testing "force? bypasses fresh cache"
+    (let [dir (temp-dir)
+          cache-file (io/file dir "x.tsv")
+          _ (spit cache-file "stale")
+          calls (atom 0)]
+      (with-redefs [tsv/fetch-bytes (fn [_] (swap! calls inc) (.getBytes "fresh"))]
+        (tsv/download-tsv {:url "http://x" :cache-file cache-file
+                           :expiration-days 7 :force? true})
+        (is (= 1 @calls))
+        (is (= "fresh" (slurp cache-file)))))))

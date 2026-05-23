@@ -2,7 +2,22 @@
  :deps {}
  :tasks
  {test {:doc "Run all tests"
-        :requires ([clojure.test :as t])
-        :task (let [{:keys [fail error]}
-                    (t/run-all-tests (re-pattern "zeus\\..*-test"))]
-                (System/exit (if (zero? (+ fail error)) 0 1)))}}}
+        :requires ([babashka.classpath :as cp]
+                   [clojure.string :as str]
+                   [clojure.test :as t])
+        :task (let [path->ns (fn [p]
+                                (-> p
+                                    (str/replace (re-pattern "^test/") "")
+                                    (str/replace (re-pattern "\\.clj$") "")
+                                    (str/replace "_" "-")
+                                    (str/replace "/" ".")
+                                    symbol))
+                    test-nses (->> (file-seq (clojure.java.io/file "test"))
+                                   (filter (fn [f] (.isFile f)))
+                                   (map (fn [f] (.getPath f)))
+                                   (filter (fn [p] (str/ends-with? p "_test.clj")))
+                                   (map path->ns))]
+                (doseq [ns test-nses] (require ns))
+                (let [{:keys [fail error]}
+                      (apply t/run-tests test-nses)]
+                  (System/exit (if (zero? (+ fail error)) 0 1))))}}}

@@ -3,6 +3,24 @@
             [clojure.java.io :as io]
             [zeus.tsv :as tsv]))
 
+(def day-ms (* 24 60 60 1000))
+
+(deftest cache-valid?
+  (testing "fresh file within expiration window"
+    (let [now (System/currentTimeMillis)]
+      (is (true? (tsv/cache-valid? (- now (* 2 day-ms)) 7 now)))))
+  (testing "stale file past expiration window"
+    (let [now (System/currentTimeMillis)]
+      (is (false? (tsv/cache-valid? (- now (* 10 day-ms)) 7 now)))))
+  (testing "expiration of 0 days means always stale"
+    (let [now (System/currentTimeMillis)]
+      (is (false? (tsv/cache-valid? now 0 now)))))
+  (testing "nil mtime (missing file) is stale"
+    (is (false? (tsv/cache-valid? nil 7 (System/currentTimeMillis)))))
+  (testing "exact boundary is fresh"
+    (let [now (System/currentTimeMillis)]
+      (is (true? (tsv/cache-valid? (- now day-ms) 1 now))))))
+
 (defn- temp-tsv [content]
   (let [f (java.io.File/createTempFile "zeus-test" ".tsv")]
     (.deleteOnExit f)

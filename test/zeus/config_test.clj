@@ -26,3 +26,25 @@
     (let [c (cfg/load-config (temp-yaml "session:\n  selected_types:\n    - psv_games\n  selected_regions:\n    - US\n"))]
       (is (= ["psv_games"] (get-in c [:session :selected_types])))
       (is (= ["US"] (get-in c [:session :selected_regions]))))))
+
+(deftest save-session
+  (testing "writes selected types and regions to the file"
+    (let [f (temp-yaml "output_dir: /tmp/out\n")]
+      (cfg/save-session f #{:ps3_games :psv_dlcs} #{:us :eu})
+      (let [c (cfg/load-config f)]
+        (is (= ["ps3_games" "psv_dlcs"] (get-in c [:session :selected_types])))
+        (is (= ["EU" "US"] (get-in c [:session :selected_regions])))
+        (is (= "/tmp/out" (:output_dir c))))))
+  (testing "values are sorted for stable diffs"
+    (let [f (temp-yaml "")]
+      (cfg/save-session f #{:psp_games :ps3_games :psv_games} #{:jp :asia :us})
+      (let [c (cfg/load-config f)]
+        (is (= ["ps3_games" "psp_games" "psv_games"]
+               (get-in c [:session :selected_types])))
+        (is (= ["ASIA" "JP" "US"]
+               (get-in c [:session :selected_regions]))))))
+  (testing "overwrites a previous session block"
+    (let [f (temp-yaml "session:\n  selected_types:\n    - old_type\n")]
+      (cfg/save-session f #{:psv_games} #{:us})
+      (is (= ["psv_games"]
+             (get-in (cfg/load-config f) [:session :selected_types]))))))

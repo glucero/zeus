@@ -1,5 +1,6 @@
 (ns zeus.search
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [zeus.tsv :as tsv]))
 
 (defn- row-title [row]
   (let [n (get row "Name")]
@@ -18,3 +19,14 @@
      (and (contains? region-strs row-region)
           (str/includes? (str/lower-case (row-title row))
                          (str/lower-case (or search-term "")))))))
+
+(defn search-content
+  "Search across TSVs for rows matching `search-term` and `regions`.
+   `tsvs` is a seq of [content-type tsv-file] pairs.
+   Matching rows are tagged with :_source = content-type."
+  [tsvs search-term regions]
+  (vec
+   (for [[content-type file] tsvs
+         row (tsv/read-tsv file)
+         :when (row-matches? row search-term regions)]
+     (assoc row :_source content-type))))

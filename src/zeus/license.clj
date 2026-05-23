@@ -1,4 +1,6 @@
-(ns zeus.license)
+(ns zeus.license
+  (:import (java.util Base64)
+           (java.util.zip Inflater)))
 
 (def ^:private sentinels #{"MISSING" "NOT REQUIRED" ""})
 
@@ -16,3 +18,29 @@
             (aset-byte out i (unchecked-byte b))))
         out)
       (catch NumberFormatException _ nil))))
+
+(defn- inflate
+  "Decompress a zlib byte array. Returns nil on failure."
+  [^bytes compressed]
+  (let [inflater (Inflater.)
+        buf (byte-array 4096)
+        out (java.io.ByteArrayOutputStream.)]
+    (.setInput inflater compressed)
+    (try
+      (while (not (.finished inflater))
+        (let [n (.inflate inflater buf)]
+          (when (zero? n)
+            (throw (ex-info "inflate stalled" {})))
+          (.write out buf 0 n)))
+      (.toByteArray out)
+      (catch Exception _ nil)
+      (finally (.end inflater)))))
+
+(defn decode-zrif
+  "Base64-decode a zRIF string, then zlib-inflate to a byte array.
+   Returns nil for nil, sentinel strings, or any decode/inflate failure."
+  [zrif]
+  (when (and (string? zrif) (not (sentinels zrif)))
+    (try
+      (inflate (.decode (Base64/getDecoder) zrif))
+      (catch Exception _ nil))))

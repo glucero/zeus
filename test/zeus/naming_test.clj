@@ -18,3 +18,16 @@
     (is (= "" (n/sanitize-filename "")))
     (is (= "" (n/sanitize-filename "   ")))
     (is (= "" (n/sanitize-filename "...")))))
+
+(deftest content-base-name
+  (testing "combines sanitized name and content id"
+    (is (= "Metal Gear Solid [UCUS98632]"
+           (n/content-base-name "Metal Gear Solid" "UCUS98632"))))
+  (testing "sanitizes invalid chars in name"
+    (is (= "AB [UCUS00001]"
+           (n/content-base-name "A/B" "UCUS00001"))))
+  (testing "falls back to content-id when name is missing"
+    (is (= "UCUS98632" (n/content-base-name nil "UCUS98632")))
+    (is (= "UCUS98632" (n/content-base-name "" "UCUS98632")))
+    (is (= "UCUS98632" (n/content-base-name "   " "UCUS98632")))))
+

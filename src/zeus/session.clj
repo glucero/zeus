@@ -1,5 +1,6 @@
 (ns zeus.session
-  (:require [clojure.string :as str]
+  (:require [clojure.set :as set]
+            [clojure.string :as str]
             [zeus.platforms :as p]))
 
 (def ^:private valid-types (set p/content-types))
@@ -29,3 +30,28 @@
    :force-refresh? false
    :last-results []
    :page-size 20})
+
+(defn- resolve-types-arg
+  "Convert a single select/unselect argument to a set of content types.
+   Accepts \"all\", a platform name, or a specific content type; case-insensitive.
+   Unknown args return an empty set."
+  [arg]
+  (let [k (-> arg str/lower-case keyword)]
+    (cond
+      (= :all k)            (set p/content-types)
+      (contains? p/platforms k) (set (get p/platforms k))
+      (valid-types k)       #{k}
+      :else                 #{})))
+
+(defn- types-from-args [args]
+  (reduce set/union #{} (map resolve-types-arg args)))
+
+(defn select-types
+  "Add the content types named by `args` to the session's selection."
+  [session args]
+  (update session :selected-types set/union (types-from-args args)))
+
+(defn unselect-types
+  "Remove the content types named by `args` from the session's selection."
+  [session args]
+  (update session :selected-types set/difference (types-from-args args)))

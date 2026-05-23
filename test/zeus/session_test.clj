@@ -25,3 +25,51 @@
     (let [s (sess/new-session
              {:session {:selected_regions []}})]
       (is (= #{} (:selected-regions s))))))
+
+(deftest select-types
+  (testing "\"all\" selects every content type"
+    (let [s (sess/select-types (sess/new-session {}) ["all"])]
+      (is (= 11 (count (:selected-types s))))))
+  (testing "platform name expands to its content types"
+    (let [s (sess/select-types (sess/new-session {}) ["ps3"])]
+      (is (= #{:ps3_games :ps3_dlcs :ps3_themes :ps3_avatars :ps3_demos}
+             (:selected-types s)))))
+  (testing "explicit content type is added"
+    (let [s (sess/select-types (sess/new-session {}) ["psv_dlcs"])]
+      (is (= #{:psv_dlcs} (:selected-types s)))))
+  (testing "multiple args union"
+    (let [s (sess/select-types (sess/new-session {}) ["psp" "psv_games"])]
+      (is (contains? (:selected-types s) :psp_games))
+      (is (contains? (:selected-types s) :psv_games))))
+  (testing "unknown args are ignored"
+    (let [s (sess/select-types (sess/new-session {}) ["nintendo" "ps3"])]
+      (is (= 5 (count (:selected-types s))))))
+  (testing "case-insensitive args"
+    (let [s (sess/select-types (sess/new-session {}) ["PS3" "PSV_Games"])]
+      (is (contains? (:selected-types s) :ps3_games))
+      (is (contains? (:selected-types s) :psv_games)))))
+
+(deftest unselect-types
+  (testing "\"all\" clears selection"
+    (let [s (-> (sess/new-session {})
+                (sess/select-types ["all"])
+                (sess/unselect-types ["all"]))]
+      (is (= #{} (:selected-types s)))))
+  (testing "platform removes its types"
+    (let [s (-> (sess/new-session {})
+                (sess/select-types ["all"])
+                (sess/unselect-types ["psm"]))]
+      (is (not (contains? (:selected-types s) :psm_games)))
+      (is (contains? (:selected-types s) :ps3_games))))
+  (testing "explicit type removes only itself"
+    (let [s (-> (sess/new-session {})
+                (sess/select-types ["ps3"])
+                (sess/unselect-types ["ps3_dlcs"]))]
+      (is (not (contains? (:selected-types s) :ps3_dlcs)))
+      (is (contains? (:selected-types s) :ps3_games))))
+  (testing "unknown arg is a no-op"
+    (let [s (-> (sess/new-session {})
+                (sess/select-types ["ps3"])
+                (sess/unselect-types ["nintendo"]))]
+      (is (= 5 (count (:selected-types s)))))))
+

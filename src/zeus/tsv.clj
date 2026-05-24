@@ -1,7 +1,8 @@
 (ns zeus.tsv
   (:require [babashka.http-client :as http]
             [clojure.data.csv :as csv]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io]
+            [zeus.platforms :as p]))
 
 (def ^:private day-ms (* 24 60 60 1000))
 
@@ -39,3 +40,25 @@
       (with-open [out (io/output-stream cache-file)]
         (.write out ^bytes (fetch-bytes url))))
     cache-file))
+
+(defn- row-content-id [row]
+  (or (get row "Content ID") (get row "Title ID")))
+
+(defn build-lookup
+  "Scan all per-content-type TSVs in `cache-dir` and merge them into a
+   {content-id -> row} map. Each row is tagged with :_source."
+  [cache-dir]
+  (reduce
+   (fn [acc ct]
+     (let [f (io/file cache-dir (str (name ct) ".tsv"))]
+       (if-not (.exists f)
+         acc
+         (reduce (fn [m row]
+                   (let [cid (row-content-id row)]
+                     (if cid
+                       (assoc m cid (assoc row :_source ct))
+                       m)))
+                 acc
+                 (read-tsv f)))))
+   {}
+   p/content-types))

@@ -83,3 +83,24 @@
                            :expiration-days 7 :force? true})
         (is (= 1 @calls))
         (is (= "fresh" (slurp cache-file)))))))
+
+(deftest build-lookup
+  (testing "merges rows across cached TSVs by Content ID"
+    (let [dir (temp-dir)]
+      (spit (io/file dir "ps3_games.tsv")
+            "Content ID\tName\nNPUB1\tGame A\nNPUB2\tGame B\n")
+      (spit (io/file dir "psv_games.tsv")
+            "Content ID\tName\nPCSE1\tVita Game\n")
+      (let [lookup (tsv/build-lookup dir)]
+        (is (= 3 (count lookup)))
+        (is (= "Game A" (get-in lookup ["NPUB1" "Name"])))
+        (is (= :ps3_games (get-in lookup ["NPUB1" :_source])))
+        (is (= :psv_games (get-in lookup ["PCSE1" :_source]))))))
+  (testing "falls back to Title ID when Content ID is missing"
+    (let [dir (temp-dir)]
+      (spit (io/file dir "psp_games.tsv")
+            "Title ID\tName\nUCUS001\tOld Game\n")
+      (is (= "Old Game"
+             (get-in (tsv/build-lookup dir) ["UCUS001" "Name"])))))
+  (testing "missing TSVs are skipped silently"
+    (is (= {} (tsv/build-lookup (temp-dir))))))

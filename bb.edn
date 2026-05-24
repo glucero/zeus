@@ -18,6 +18,7 @@
                                    (filter (fn [p] (str/ends-with? p "_test.clj")))
                                    (map path->ns))]
                 (doseq [ns test-nses] (require ns))
+                (defmethod t/report :begin-test-ns [_])
                 (let [{:keys [fail error]}
                       (apply t/run-tests test-nses)]
                   (System/exit (if (zero? (+ fail error)) 0 1))))}}}

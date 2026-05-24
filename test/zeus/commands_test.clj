@@ -97,3 +97,31 @@
       (with-redefs [tsv/fetch-bytes (fn [_] (swap! fetched inc) (byte-array 0))]
         (silenced cmd/handle-sync session))
       (is (zero? @fetched)))))
+
+(deftest handle-search
+  (let [dir (temp-dir)
+        _ (spit (io/file dir "ps3_games.tsv")
+                "Name\tRegion\tContent ID\tFile Size\nMetal Gear\tUS\tNPUB1\t1073741824\nPersona\tJP\tNPJB2\t2147483648\n")
+        _ (spit (io/file dir "psv_games.tsv")
+                "Name\tRegion\tContent ID\tFile Size\nUncharted\tUS\tPCSE1\t1500000000\n")
+        config {:cache_dir (str dir)
+                :cache_expiration_days 7
+                :catalog_urls {:ps3_games "http://x/ps3"
+                           :psv_games "http://x/psv"}}
+        session (-> (sess/new-session config)
+                    (sess/select-types ["ps3_games" "psv_games"]))]
+    (testing "stores matching results in session"
+      (let [s (silenced cmd/handle-search session ["metal"])]
+        (is (= 1 (count (:last-results s))))
+        (is (= "Metal Gear" (get (first (:last-results s)) "Name")))))
+    (testing "results respect the active region filter"
+      (let [filtered (assoc session :selected-regions #{:jp})
+            s (silenced cmd/handle-search filtered [""])]
+        (is (= ["Persona"] (map #(get % "Name") (:last-results s))))))
+    (testing "no selected types prints a warning and leaves results untouched"
+      (let [empty-sess (sess/new-session config)
+            s (silenced cmd/handle-search empty-sess ["x"])]
+        (is (= [] (:last-results s)))))
+    (testing "empty search args asks for a term"
+      (let [s (silenced cmd/handle-search session [])]
+        (is (= [] (:last-results s)))))))

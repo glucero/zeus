@@ -2,7 +2,10 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [zeus.colors :as c]
+            [zeus.format :as fmt]
+            [zeus.naming :as naming]
             [zeus.platforms :as p]
+            [zeus.search :as search]
             [zeus.session :as sess]
             [zeus.tsv :as tsv]))
 
@@ -152,3 +155,52 @@
                  (println " " (c/color :red "error syncing")
                           (name ct) "—" (.getMessage e)))))))
   session)
+
+(defn- ensure-tsv
+  "Ensure the TSV for `content-type` is on disk and return its file, or nil
+   when no URL is configured / download fails."
+  [{:keys [config force-refresh?]} content-type]
+  (when-let [url (get-in config [:catalog_urls content-type])]
+    (try
+      (tsv/download-tsv {:url url
+                         :cache-file (cache-file-for config content-type)
+                         :expiration-days (:cache_expiration_days config)
+                         :force? force-refresh?})
+      (catch Exception _ nil))))
+
+(defn- print-result-row [i row]
+  (let [source (:_source row)
+        plat (p/platform-from-source source)
+        ct (last (str/split (name source) #"_"))]
+    (println (format "  %3d. %s │ %s │ %-40s │ %-4s │ %9s"
+                     (inc i)
+                     (c/color (c/platform-color plat) (name plat))
+                     ct
+                     (or (get row "Name") (get row "Title") "")
+                     (or (get row "Region") "")
+                     (or (fmt/format-size (get row "File Size")) "")))))
+
+(defn handle-search
+  "Search across the selected content types' TSVs for `term`.
+   Stores matches in session :last-results and prints a numbered list."
+  [{:keys [selected-types selected-regions] :as session} args]
+  (cond
+    (empty? args)
+    (do (println "  usage: search <term>") session)
+
+    (empty? selected-types)
+    (do (println " " (c/color :yellow "no content types selected — use 'select' first"))
+        session)
+
+    :else
+    (let [term (str/join " " args)
+          _ (println "  searching for" (c/color :cyan term) "...")
+          tsvs (keep (fn [ct] (when-let [f (ensure-tsv session ct)] [ct f]))
+                     (sort selected-types))
+          results (search/search-content tsvs term selected-regions)]
+      (if (empty? results)
+        (do (println " " (c/color :yellow "no results")) (sess/set-results session []))
+        (do (println " " (c/color :green (str "found " (count results) " result(s):")))
+            (doseq [[i row] (map-indexed vector results)]
+              (print-result-row i row))
+            (sess/set-results session results))))))

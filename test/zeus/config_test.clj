@@ -47,4 +47,10 @@
     (let [f (temp-yaml "session:\n  selected_types:\n    - old_type\n")]
       (cfg/save-session f #{:psv_games} #{:us})
       (is (= ["psv_games"]
-             (get-in (cfg/load-config f) [:session :selected_types]))))))
+             (get-in (cfg/load-config f) [:session :selected_types])))))
+  (testing "emits block-style yaml (one key per line)"
+    (let [f (temp-yaml "")]
+      (cfg/save-session f #{:psv_games :ps3_games} #{:us :eu})
+      (let [text (slurp f)]
+        (is (re-find #"selected_types:\s*\n\s+- ps3_games" text))
+        (is (re-find #"selected_regions:\s*\n\s+- EU" text))))))

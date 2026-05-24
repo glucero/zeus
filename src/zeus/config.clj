@@ -23,4 +23,4 @@
         updated (assoc current :session
                        {:selected_types (vec types)
                         :selected_regions (vec regions)})]
-    (spit path (yaml/generate-string updated))))
+    (spit path (yaml/generate-string updated :dumper-options {:flow-style :block}))))

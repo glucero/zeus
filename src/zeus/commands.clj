@@ -2,6 +2,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [zeus.colors :as c]
+            [zeus.extract :as extract]
             [zeus.format :as fmt]
             [zeus.license :as license]
             [zeus.naming :as naming]
@@ -217,6 +218,50 @@
     (when-not (= f target)
       (.renameTo f target)
       target)))
+
+(defn- extract-item [item content-dir]
+  (let [plat (p/platform-from-source (:_source item))
+        pkg-file (first (filter #(.endsWith (.getName %) ".pkg")
+                                (.listFiles ^java.io.File content-dir)))]
+    (cond
+      (nil? pkg-file)
+      (println " " (c/color :red "no PKG found in") (str content-dir))
+
+      (= :psp plat)
+      (if-let [out (extract/extract-psp pkg-file content-dir)]
+        (println " " (c/color :green "✓ extracted:") (c/color :dim (.getName out)))
+        (println " " (c/color :red "extract failed")))
+
+      (= :psx plat)
+      (if-let [out (extract/extract-psx pkg-file content-dir)]
+        (println " " (c/color :green "✓ extracted:") (c/color :dim (.getName out)))
+        (println " " (c/color :red "extract failed")))
+
+      :else
+      (println " " (c/color :dim "extract not needed for") (name plat)))))
+
+(defn handle-extract
+  "Extract PSP/PSX ISO from PKG for last-results items indexed by `args`."
+  [{:keys [last-results config] :as session} args]
+  (cond
+    (empty? args)
+    (println "  usage: extract <number> [number2 ...]")
+
+    (empty? last-results)
+    (println "  no search results — run 'search' first")
+
+    :else
+    (doseq [a args
+            :let [i (parse-index a (count last-results))]
+            :when i
+            :let [item (nth last-results i)
+                  cid (or (get item "Content ID") (get item "Title ID"))
+                  dir (naming/content-dir (:output_dir config)
+                                          (:_source item) cid)]]
+      (println (c/color :dim "  ────────────────────────────"))
+      (println " " (c/color :bold "📀") (or (get item "Name") cid))
+      (extract-item item dir)))
+  session)
 
 (defn- has-license? [^java.io.File dir]
   (boolean

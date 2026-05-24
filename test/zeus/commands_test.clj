@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [zeus.commands :as cmd]
+            [zeus.extract :as ex]
             [zeus.pkg :as pkg]
             [zeus.session :as sess]
             [zeus.tsv :as tsv])
@@ -99,6 +100,38 @@
       (with-redefs [tsv/fetch-bytes (fn [_] (swap! fetched inc) (byte-array 0))]
         (silenced cmd/handle-sync session))
       (is (zero? @fetched)))))
+
+(deftest handle-extract
+  (let [out-dir (temp-dir)
+        item-dir (doto (io/file out-dir "psp" "UCUS001") .mkdirs)
+        _ (spit (io/file item-dir "game.pkg") "x")
+        item {:_source :psp_games "Name" "PSP Game"
+              "Content ID" "UCUS001"}
+        session (-> (sess/new-session {:output_dir (str out-dir)})
+                    (sess/set-results [item]))
+        calls (atom [])]
+    (testing "indexed item dispatches to extract-psp"
+      (with-redefs [ex/extract-psp (fn [pkg dir]
+                                     (swap! calls conj [:psp (str pkg) (str dir)])
+                                     (io/file dir "GAME.ISO"))]
+        (silenced cmd/handle-extract session ["1"]))
+      (is (= 1 (count @calls)))
+      (is (= :psp (first (first @calls)))))
+    (testing "psx item dispatches to extract-psx"
+      (let [psx-dir (doto (io/file out-dir "psx" "SCUS001") .mkdirs)
+            _ (spit (io/file psx-dir "x.pkg") "x")
+            psx-item {:_source :psx_games "Content ID" "SCUS001"}
+            session (-> (sess/new-session {:output_dir (str out-dir)})
+                        (sess/set-results [psx-item]))
+            calls (atom [])]
+        (with-redefs [ex/extract-psx (fn [pkg dir]
+                                       (swap! calls conj [:psx])
+                                       (io/file dir "OUT.bin"))]
+          (silenced cmd/handle-extract session ["1"]))
+        (is (= [[:psx]] @calls))))
+    (testing "usage error when no args"
+      (let [out (with-out-str (cmd/handle-extract session []))]
+        (is (str/includes? (str/lower-case out) "usage"))))))
 
 (defn- write-fixture-tsv [dir filename content]
   (spit (doto (io/file dir filename) (-> (.getParentFile) (.mkdirs))) content))

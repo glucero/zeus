@@ -98,3 +98,10 @@
                 (regions-part selected-regions)
                 (conj (regions-part selected-regions)))]
     (str "zeus[" (str/join ":" parts) "]> ")))
+
+(defn clear-selections
+  "Drop all selected types and restore the full set of regions."
+  [session]
+  (assoc session
+         :selected-types #{}
+         :selected-regions valid-regions))

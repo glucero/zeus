@@ -116,3 +116,11 @@
                 (sess/select-types ["ps3"]))]
       (is (= "zeus[ps3:no-region]> " (sess/prompt-str s))))))
 
+(deftest clear-selections
+  (testing "drops all selected types and restores all regions"
+    (let [s (-> (sess/new-session {:session {:selected_regions ["US"]}})
+                (sess/select-types ["ps3"])
+                (sess/clear-selections))]
+      (is (= #{} (:selected-types s)))
+      (is (= #{:us :eu :jp :asia} (:selected-regions s))))))
+

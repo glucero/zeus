@@ -2,7 +2,14 @@
   (:require [babashka.http-client :as http]
             [clojure.data.csv :as csv]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [zeus.platforms :as p]))
+
+(defn header->key
+  "Convert a TSV header label to an idiomatic kebab-case keyword.
+   Example: \"PKG direct link\" -> :pkg-direct-link."
+  [s]
+  (-> s str/lower-case (str/replace #"\s+" "-") keyword))
 
 (def ^:private day-ms (* 24 60 60 1000))
 
@@ -16,11 +23,13 @@
         (>= mtime (- now-ms (* expiration-days day-ms))))))
 
 (defn read-tsv
-  "Read a tab-separated file into a vector of maps keyed by the header row."
+  "Read a tab-separated file into a vector of maps with kebab-case
+   keyword keys derived from the header row."
   [file]
   (with-open [r (io/reader file)]
-    (let [[header & rows] (csv/read-csv r :separator \tab)]
-      (mapv #(zipmap header %) (vec rows)))))
+    (let [[header & rows] (csv/read-csv r :separator \tab)
+          ks (mapv header->key header)]
+      (mapv #(zipmap ks %) (vec rows)))))
 
 (defn fetch-bytes
   "Fetch the URL and return the response body as a byte array.
@@ -42,7 +51,7 @@
     cache-file))
 
 (defn- row-content-id [row]
-  (or (get row "Content ID") (get row "Title ID")))
+  (or (:content-id row) (:title-id row)))
 
 (defn build-lookup
   "Scan all per-content-type TSVs in `cache-dir` and merge them into a

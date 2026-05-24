@@ -55,10 +55,10 @@
   f)
 
 (defn- item-content-id [item]
-  (or (get item "Content ID") (get item "Title ID")))
+  (or (:content-id item) (:title-id item)))
 
 (defn- item-name [item]
-  (or (get item "Name") (get item "Title")))
+  (or (:name item) (:title item)))
 
 (defn write-license-file
   "Write the platform-appropriate license file for `item` into `dir`.
@@ -67,11 +67,11 @@
   (let [plat (p/platform-from-source (:_source item))]
     (case plat
       (:psv :psm)
-      (when-let [data (decode-zrif (get item "zRIF"))]
+      (when-let [data (decode-zrif (:zrif item))]
         (write-bytes (io/file dir "work.bin") data))
 
       (:ps3 :psp)
-      (when-let [data (decode-rap (get item "RAP"))]
+      (when-let [data (decode-rap (:rap item))]
         (let [base (naming/content-base-name (item-name item)
                                              (item-content-id item))]
           (write-bytes (io/file dir (str base ".rap")) data)))

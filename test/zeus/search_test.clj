@@ -11,25 +11,25 @@
 (def all-regions #{:us :eu :jp :asia})
 
 (deftest row-matches?
-  (testing "search term is matched case-insensitively in Name"
-    (is (true? (s/row-matches? {"Name" "Metal Gear Solid" "Region" "US"}
+  (testing "search term is matched case-insensitively in :name"
+    (is (true? (s/row-matches? {:name "Metal Gear Solid" :region "US"}
                                "metal" all-regions)))
-    (is (true? (s/row-matches? {"Name" "Metal Gear Solid" "Region" "US"}
+    (is (true? (s/row-matches? {:name "Metal Gear Solid" :region "US"}
                                "GEAR" all-regions))))
-  (testing "falls back to Title when Name is missing or blank"
-    (is (true? (s/row-matches? {"Title" "Tetris" "Region" "JP"}
+  (testing "falls back to :title when :name is missing or blank"
+    (is (true? (s/row-matches? {:title "Tetris" :region "JP"}
                                "tet" all-regions))))
   (testing "search term not found"
-    (is (false? (s/row-matches? {"Name" "Metal Gear" "Region" "US"}
+    (is (false? (s/row-matches? {:name "Metal Gear" :region "US"}
                                 "zelda" all-regions))))
   (testing "region filter"
-    (is (true? (s/row-matches? {"Name" "X" "Region" "US"} "" #{:us})))
-    (is (false? (s/row-matches? {"Name" "X" "Region" "US"} "" #{:eu})))
-    (is (true? (s/row-matches? {"Name" "X" "Region" "us"} "" #{:us}))))
+    (is (true? (s/row-matches? {:name "X" :region "US"} "" #{:us})))
+    (is (false? (s/row-matches? {:name "X" :region "US"} "" #{:eu})))
+    (is (true? (s/row-matches? {:name "X" :region "us"} "" #{:us}))))
   (testing "empty region set matches nothing"
-    (is (false? (s/row-matches? {"Name" "X" "Region" "US"} "" #{}))))
+    (is (false? (s/row-matches? {:name "X" :region "US"} "" #{}))))
   (testing "empty search term matches any name"
-    (is (true? (s/row-matches? {"Name" "Anything" "Region" "US"}
+    (is (true? (s/row-matches? {:name "Anything" :region "US"}
                                "" all-regions)))))
 
 (deftest search-content
@@ -41,10 +41,10 @@
                                       "metal" all-regions)]
         (is (= 2 (count results)))
         (is (= #{:ps3_games :psv_games} (set (map :_source results))))
-        (is (every? #(re-find #"(?i)metal" (get % "Name")) results))))
+        (is (every? #(re-find #"(?i)metal" (:name %)) results))))
     (testing "region filter applies"
       (let [results (s/search-content [[:ps3_games ps3] [:psv_games psv]]
                                       "" #{:eu})]
-        (is (= ["Killzone"] (map #(get % "Name") results)))))
+        (is (= ["Killzone"] (map :name results)))))
     (testing "empty input yields empty result"
       (is (empty? (s/search-content [] "x" all-regions))))))

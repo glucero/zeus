@@ -105,8 +105,8 @@
   (let [out-dir (temp-dir)
         item-dir (doto (io/file out-dir "psp" "UCUS001") .mkdirs)
         _ (spit (io/file item-dir "game.pkg") "x")
-        item {:_source :psp_games "Name" "PSP Game"
-              "Content ID" "UCUS001"}
+        item {:_source :psp_games :name "PSP Game"
+              :content-id "UCUS001"}
         session (-> (sess/new-session {:output_dir (str out-dir)})
                     (sess/set-results [item]))
         calls (atom [])]
@@ -120,7 +120,7 @@
     (testing "psx item dispatches to extract-psx"
       (let [psx-dir (doto (io/file out-dir "psx" "SCUS001") .mkdirs)
             _ (spit (io/file psx-dir "x.pkg") "x")
-            psx-item {:_source :psx_games "Content ID" "SCUS001"}
+            psx-item {:_source :psx_games :content-id "SCUS001"}
             session (-> (sess/new-session {:output_dir (str out-dir)})
                         (sess/set-results [psx-item]))
             calls (atom [])]
@@ -186,9 +186,9 @@
   (let [out-dir (temp-dir)
         config {:output_dir (str out-dir)}
         item {:_source :ps3_games
-              "Name" "Test" "Content ID" "NPUB1"
-              "PKG direct link" "http://x/x.pkg"
-              "RAP" "0123456789abcdef0123456789abcdef"}
+              :name "Test" :content-id "NPUB1"
+              :pkg-direct-link "http://x/x.pkg"
+              :rap "0123456789abcdef0123456789abcdef"}
         session (-> (sess/new-session config)
                     (sess/set-results [item]))]
     (testing "writes PKG and license for indexed item"
@@ -213,11 +213,11 @@
   (let [session (-> (sess/new-session {})
                     (sess/set-results
                      [{:_source :ps3_games
-                       "Name" "Test Game" "Title ID" "BLUS00001"
-                       "Content ID" "NPUB12345" "Region" "US"
-                       "File Size" "1073741824"
-                       "PKG direct link" "http://x"
-                       "RAP" "0123456789abcdef0123456789abcdef"}]))]
+                       :name "Test Game" :title-id "BLUS00001"
+                       :content-id "NPUB12345" :region "US"
+                       :file-size "1073741824"
+                       :pkg-direct-link "http://x"
+                       :rap "0123456789abcdef0123456789abcdef"}]))]
     (testing "prints details for valid index"
       (let [out (with-out-str (cmd/handle-info session ["1"]))]
         (is (str/includes? out "Test Game"))
@@ -249,11 +249,11 @@
     (testing "stores matching results in session"
       (let [s (silenced cmd/handle-search session ["metal"])]
         (is (= 1 (count (:last-results s))))
-        (is (= "Metal Gear" (get (first (:last-results s)) "Name")))))
+        (is (= "Metal Gear" (:name (first (:last-results s)))))))
     (testing "results respect the active region filter"
       (let [filtered (assoc session :selected-regions #{:jp})
             s (silenced cmd/handle-search filtered [""])]
-        (is (= ["Persona"] (map #(get % "Name") (:last-results s))))))
+        (is (= ["Persona"] (map :name (:last-results s))))))
     (testing "no selected types prints a warning and leaves results untouched"
       (let [empty-sess (sess/new-session config)
             s (silenced cmd/handle-search empty-sess ["x"])]

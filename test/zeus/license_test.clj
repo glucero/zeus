@@ -62,31 +62,31 @@
     (let [d (temp-dir)
           payload (.getBytes "vita-license")
           item {:_source :psv_games
-                "Content ID" "PCSE00001"
-                "Name" "Vita Game"
-                "zRIF" (zrif-encode payload)}
+                :content-id "PCSE00001"
+                :name "Vita Game"
+                :zrif (zrif-encode payload)}
           out (l/write-license-file item d)]
       (is (= "work.bin" (.getName out)))
       (is (= (seq payload) (seq (.readAllBytes (io/input-stream out)))))))
   (testing "ps3 writes RAP bytes to '<base>.rap'"
     (let [d (temp-dir)
-          item {:_source :ps3_games "Content ID" "NPUB12345"
-                "Name" "PS3 Game" "RAP" valid-rap}
+          item {:_source :ps3_games :content-id "NPUB12345"
+                :name "PS3 Game" :rap valid-rap}
           out (l/write-license-file item d)]
       (is (= "PS3 Game [NPUB12345].rap" (.getName out)))
       (is (= 16 (count (.readAllBytes (io/input-stream out)))))))
   (testing "ps3 falls back to '<content-id>.rap' when name is missing"
     (let [d (temp-dir)
-          item {:_source :ps3_games "Content ID" "NPUB12345" "RAP" valid-rap}
+          item {:_source :ps3_games :content-id "NPUB12345" :rap valid-rap}
           out (l/write-license-file item d)]
       (is (= "NPUB12345.rap" (.getName out)))))
   (testing "psx returns nil (no license needed)"
     (is (nil? (l/write-license-file {:_source :psx_games} (temp-dir)))))
   (testing "missing license data returns nil"
-    (is (nil? (l/write-license-file {:_source :ps3_games "RAP" "MISSING"
-                                     "Content ID" "X"}
+    (is (nil? (l/write-license-file {:_source :ps3_games :rap "MISSING"
+                                     :content-id "X"}
                                     (temp-dir))))
-    (is (nil? (l/write-license-file {:_source :psv_games "zRIF" ""
-                                     "Content ID" "X"}
+    (is (nil? (l/write-license-file {:_source :psv_games :zrif ""
+                                     :content-id "X"}
                                     (temp-dir))))))
 

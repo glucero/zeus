@@ -14,9 +14,9 @@
      :headers {"content-length" (str (.length body))}}))
 
 (def item {:_source :ps3_games
-           "Content ID" "NPUB12345"
-           "Name" "Test Game"
-           "PKG direct link" "http://example/x.pkg"})
+           :content-id "NPUB12345"
+           :name "Test Game"
+           :pkg-direct-link "http://example/x.pkg"})
 
 (deftest download-pkg
   (testing "downloads to '<base>.pkg' and returns the file"
@@ -37,8 +37,8 @@
           (is (= existing out))
           (is (zero? @called))))))
   (testing "returns nil when URL is missing or MISSING"
-    (is (nil? (pkg/download-pkg (dissoc item "PKG direct link") (temp-dir) {})))
-    (is (nil? (pkg/download-pkg (assoc item "PKG direct link" "MISSING")
+    (is (nil? (pkg/download-pkg (dissoc item :pkg-direct-link) (temp-dir) {})))
+    (is (nil? (pkg/download-pkg (assoc item :pkg-direct-link "MISSING")
                                 (temp-dir) {}))))
   (testing "invokes progress callback with downloaded/total"
     (let [d (temp-dir)

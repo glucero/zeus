@@ -27,23 +27,30 @@
     (spit f content)
     f))
 
+(deftest header->key
+  (testing "lowercases and dasherizes"
+    (is (= :content-id (tsv/header->key "Content ID")))
+    (is (= :pkg-direct-link (tsv/header->key "PKG direct link")))
+    (is (= :name (tsv/header->key "Name")))
+    (is (= :zrif (tsv/header->key "zRIF")))))
+
 (deftest read-tsv
-  (testing "parses header row into map keys"
+  (testing "parses header row into kebab-case keyword keys"
     (let [f (temp-tsv "Name\tRegion\tTitle ID\nGame A\tUS\tABC123\nGame B\tEU\tDEF456\n")
           rows (tsv/read-tsv f)]
       (is (= 2 (count rows)))
-      (is (= {"Name" "Game A" "Region" "US" "Title ID" "ABC123"}
+      (is (= {:name "Game A" :region "US" :title-id "ABC123"}
              (first rows)))
-      (is (= "DEF456" (get (second rows) "Title ID")))))
+      (is (= "DEF456" (:title-id (second rows))))))
   (testing "empty body yields no rows"
     (let [f (temp-tsv "Name\tRegion\n")]
       (is (= [] (tsv/read-tsv f)))))
   (testing "handles missing trailing values"
     (let [f (temp-tsv "Name\tRegion\tTitle ID\nGame A\tUS\n")
           row (first (tsv/read-tsv f))]
-      (is (= "Game A" (get row "Name")))
-      (is (= "US" (get row "Region")))
-      (is (nil? (get row "Title ID"))))))
+      (is (= "Game A" (:name row)))
+      (is (= "US" (:region row)))
+      (is (nil? (:title-id row))))))
 
 (defn- temp-dir []
   (doto (java.io.File/createTempFile "zeus-cache" "")
@@ -93,7 +100,7 @@
             "Content ID\tName\nPCSE1\tVita Game\n")
       (let [lookup (tsv/build-lookup dir)]
         (is (= 3 (count lookup)))
-        (is (= "Game A" (get-in lookup ["NPUB1" "Name"])))
+        (is (= "Game A" (get-in lookup ["NPUB1" :name])))
         (is (= :ps3_games (get-in lookup ["NPUB1" :_source])))
         (is (= :psv_games (get-in lookup ["PCSE1" :_source]))))))
   (testing "falls back to Title ID when Content ID is missing"
@@ -101,6 +108,6 @@
       (spit (io/file dir "psp_games.tsv")
             "Title ID\tName\nUCUS001\tOld Game\n")
       (is (= "Old Game"
-             (get-in (tsv/build-lookup dir) ["UCUS001" "Name"])))))
+             (get-in (tsv/build-lookup dir) ["UCUS001" :name])))))
   (testing "missing TSVs are skipped silently"
     (is (= {} (tsv/build-lookup (temp-dir))))))

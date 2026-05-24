@@ -167,12 +167,12 @@
 
 (defn- print-license-status [plat item]
   (case plat
-    :psv (let [z (get item "zRIF")]
+    :psv (let [z (:zrif item)]
            (println "  zRIF:      "
                     (if (and z (not (#{"" "MISSING"} z)))
                       (c/color :green "✓ available")
                       (c/color :red "✗ missing"))))
-    (:ps3 :psp) (let [r (get item "RAP")]
+    (:ps3 :psp) (let [r (:rap item)]
                   (println "  RAP:       "
                            (cond
                              (= "NOT REQUIRED" r) (c/color :dim "not required")
@@ -189,11 +189,11 @@
     (flush)))
 
 (defn- download-one [{:keys [config]} item]
-  (let [content-id (or (get item "Content ID") (get item "Title ID") "unknown")
+  (let [content-id (or (:content-id item) (:title-id item) "unknown")
         dir (naming/content-dir (:output_dir config) (:_source item) content-id)]
     (.mkdirs ^java.io.File dir)
     (println (c/color :dim "  ────────────────────────────"))
-    (println " " (c/color :bold "⬇") (or (get item "Name") (get item "Title")))
+    (println " " (c/color :bold "⬇") (or (:name item) (:title item)))
     (when-let [pkg-file (pkg/download-pkg item dir {:progress-fn (progress-printer)})]
       (println)
       (println " " (c/color :green "✓ PKG:") (c/color :dim (.getName pkg-file))))
@@ -255,11 +255,11 @@
             :let [i (parse-index a (count last-results))]
             :when i
             :let [item (nth last-results i)
-                  cid (or (get item "Content ID") (get item "Title ID"))
+                  cid (or (:content-id item) (:title-id item))
                   dir (naming/content-dir (:output_dir config)
                                           (:_source item) cid)]]
       (println (c/color :dim "  ────────────────────────────"))
-      (println " " (c/color :bold "📀") (or (get item "Name") cid))
+      (println " " (c/color :bold "📀") (or (:name item) cid))
       (extract-item item dir)))
   session)
 
@@ -307,7 +307,7 @@
                     item (get lookup cid)]
               :when item
               :let [base (naming/content-base-name
-                          (or (get item "Name") (get item "Title")) cid)]
+                          (or (:name item) (:title item)) cid)]
               ext ["pkg" "rap"]
               :let [old (io/file dir (str cid "." ext))]
               :when (.exists old)]
@@ -346,14 +346,14 @@
       (let [item (nth last-results idx)
             source (:_source item)
             plat (p/platform-from-source source)
-            size-bytes (get item "File Size")
-            pkg-url (get item "PKG direct link")]
+            size-bytes (:file-size item)
+            pkg-url (:pkg-direct-link item)]
         (println " " (c/color :dim "────────────────────────────"))
-        (println " " (c/color :bold (or (get item "Name") (get item "Title") "")))
+        (println " " (c/color :bold (or (:name item) (:title item) "")))
         (println " " (c/color :dim "────────────────────────────"))
-        (println "  Title ID:  " (c/color :cyan (or (get item "Title ID") "—")))
-        (println "  Content ID:" (c/color :dim (or (get item "Content ID") "—")))
-        (println "  Region:    " (or (get item "Region") "—"))
+        (println "  Title ID:  " (c/color :cyan (or (:title-id item) "—")))
+        (println "  Content ID:" (c/color :dim (or (:content-id item) "—")))
+        (println "  Region:    " (or (:region item) "—"))
         (println "  Platform:  " (c/color (c/platform-color plat) (name plat))
                  (c/color :dim (str "(" (name source) ")")))
         (when (seq size-bytes)
@@ -387,9 +387,9 @@
                      (inc i)
                      (c/color (c/platform-color plat) (name plat))
                      ct
-                     (or (get row "Name") (get row "Title") "")
-                     (or (get row "Region") "")
-                     (or (fmt/format-size (get row "File Size")) "")))))
+                     (or (:name row) (:title row) "")
+                     (or (:region row) "")
+                     (or (fmt/format-size (:file-size row)) "")))))
 
 (defn handle-search
   "Search across the selected content types' TSVs for `term`.

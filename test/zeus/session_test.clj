@@ -132,7 +132,7 @@
 
 (deftest set-results
   (testing "stores last search results"
-    (let [rs [{"Name" "A"} {"Name" "B"}]
+    (let [rs [{:name "A"} {:name "B"}]
           s  (sess/set-results (sess/new-session {}) rs)]
       (is (= rs (:last-results s))))))
 

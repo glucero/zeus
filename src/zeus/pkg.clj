@@ -7,10 +7,10 @@
   (or (nil? url) (= "" url) (= "MISSING" url)))
 
 (defn- item-content-id [item]
-  (or (get item "Content ID") (get item "Title ID") "unknown"))
+  (or (:content-id item) (:title-id item) "unknown"))
 
 (defn- item-name [item]
-  (or (get item "Name") (get item "Title")))
+  (or (:name item) (:title item)))
 
 (defn- pkg-filename [item]
   (str (naming/content-base-name (item-name item) (item-content-id item))
@@ -55,7 +55,7 @@
      :timeout     http timeout in ms (default 30000)"
   [item dir {:keys [progress-fn chunk-size timeout]
              :or {chunk-size 8192 timeout 30000}}]
-  (let [url (get item "PKG direct link")]
+  (let [url (:pkg-direct-link item)]
     (when-not (missing-url? url)
       (.mkdirs ^java.io.File (io/file dir))
       (or (existing-pkg dir)

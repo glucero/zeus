@@ -3,18 +3,18 @@
             [zeus.tsv :as tsv]))
 
 (defn- row-title [row]
-  (let [n (get row "Name")]
+  (let [n (:name row)]
     (if (str/blank? n)
-      (or (get row "Title") "")
+      (or (:title row) "")
       n)))
 
 (defn row-matches?
   "True when row's region is in the (uppercased) region set AND
-   search-term is a case-insensitive substring of its Name/Title.
+   search-term is a case-insensitive substring of its name/title.
    An empty region set matches nothing."
   [row search-term regions]
   (let [region-strs (set (map (comp str/upper-case name) regions))
-        row-region (str/upper-case (or (get row "Region") ""))]
+        row-region (str/upper-case (or (:region row) ""))]
     (boolean
      (and (contains? region-strs row-region)
           (str/includes? (str/lower-case (row-title row))

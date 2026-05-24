@@ -3,8 +3,10 @@
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [zeus.commands :as cmd]
+            [zeus.pkg :as pkg]
             [zeus.session :as sess]
-            [zeus.tsv :as tsv]))
+            [zeus.tsv :as tsv])
+  (:import (java.io ByteArrayInputStream)))
 
 (defn- temp-dir []
   (doto (java.io.File/createTempFile "zeus-cmd" "")
@@ -97,6 +99,33 @@
       (with-redefs [tsv/fetch-bytes (fn [_] (swap! fetched inc) (byte-array 0))]
         (silenced cmd/handle-sync session))
       (is (zero? @fetched)))))
+
+(deftest handle-download
+  (let [out-dir (temp-dir)
+        config {:output_dir (str out-dir)}
+        item {:_source :ps3_games
+              "Name" "Test" "Content ID" "NPUB1"
+              "PKG direct link" "http://x/x.pkg"
+              "RAP" "0123456789abcdef0123456789abcdef"}
+        session (-> (sess/new-session config)
+                    (sess/set-results [item]))]
+    (testing "writes PKG and license for indexed item"
+      (with-redefs [pkg/fetch-stream
+                    (fn [_ _]
+                      {:body (ByteArrayInputStream. (.getBytes "pkgbytes"))
+                       :headers {"content-length" "8"}})]
+        (silenced cmd/handle-download session ["1"]))
+      (let [content-dir (io/file out-dir "ps3" "NPUB1")
+            files (set (map #(.getName %) (.listFiles content-dir)))]
+        (is (contains? files "Test [NPUB1].pkg"))
+        (is (contains? files "Test [NPUB1].rap"))))
+    (testing "usage error when no args"
+      (let [out (with-out-str (cmd/handle-download session []))]
+        (is (str/includes? (str/lower-case out) "usage"))))
+    (testing "no results yet"
+      (let [out (with-out-str (cmd/handle-download (sess/new-session config)
+                                                   ["1"]))]
+        (is (str/includes? (str/lower-case out) "search"))))))
 
 (deftest handle-info
   (let [session (-> (sess/new-session {})

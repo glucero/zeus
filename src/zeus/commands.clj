@@ -3,7 +3,9 @@
             [clojure.string :as str]
             [zeus.colors :as c]
             [zeus.format :as fmt]
+            [zeus.license :as license]
             [zeus.naming :as naming]
+            [zeus.pkg :as pkg]
             [zeus.platforms :as p]
             [zeus.search :as search]
             [zeus.session :as sess]
@@ -176,6 +178,40 @@
                              (and r (not (#{"" "MISSING"} r))) (c/color :green "✓ available")
                              :else (c/color :red "✗ missing"))))
     nil))
+
+(defn- progress-printer []
+  (fn [done total]
+    (print (format "\r  progress: %.1f%% (%.1f/%.1f MB)"
+                   (* 100.0 (/ done (double total)))
+                   (/ done (* 1024.0 1024))
+                   (/ total (* 1024.0 1024))))
+    (flush)))
+
+(defn- download-one [{:keys [config]} item]
+  (let [content-id (or (get item "Content ID") (get item "Title ID") "unknown")
+        dir (naming/content-dir (:output_dir config) (:_source item) content-id)]
+    (.mkdirs ^java.io.File dir)
+    (println (c/color :dim "  ────────────────────────────"))
+    (println " " (c/color :bold "⬇") (or (get item "Name") (get item "Title")))
+    (when-let [pkg-file (pkg/download-pkg item dir {:progress-fn (progress-printer)})]
+      (println)
+      (println " " (c/color :green "✓ PKG:") (c/color :dim (.getName pkg-file))))
+    (when-let [lic (license/write-license-file item dir)]
+      (println " " (c/color :green "✓ license:") (c/color :dim (.getName lic))))))
+
+(defn handle-download
+  "Download PKG + license for each indexed item in last-results."
+  [{:keys [last-results] :as session} args]
+  (cond
+    (empty? args)         (println "  usage: download <number> [number2 ...]")
+    (empty? last-results) (println "  no search results — run 'search' first")
+    :else
+    (let [indices (keep (fn [a] (parse-index a (count last-results))) args)]
+      (doseq [i indices]
+        (try (download-one session (nth last-results i))
+             (catch Exception e
+               (println " " (c/color :red "error:") (.getMessage e)))))))
+  session)
 
 (defn handle-info
   "Print full details for last-results[n-1]."

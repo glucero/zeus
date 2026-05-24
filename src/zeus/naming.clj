@@ -1,5 +1,7 @@
 (ns zeus.naming
-  (:require [clojure.string :as str]))
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
+            [zeus.platforms :as p]))
 
 (def ^:private invalid-chars #{\< \> \: \" \/ \\ \| \? \*})
 
@@ -19,3 +21,11 @@
     (if (str/blank? clean)
       content-id
       (str clean " [" content-id "]"))))
+
+(defn content-dir
+  "Build the per-item directory path: output-dir / platform-folder / content-id.
+   Unknown source types use the source name as the folder."
+  [output-dir source content-id]
+  (let [plat (p/platform-from-source source)
+        folder (or (p/platform-folders plat) (name plat))]
+    (io/file output-dir folder content-id)))

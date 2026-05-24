@@ -31,3 +31,13 @@
     (is (= "UCUS98632" (n/content-base-name "" "UCUS98632")))
     (is (= "UCUS98632" (n/content-base-name "   " "UCUS98632")))))
 
+(deftest content-dir
+  (testing "joins output-dir, platform folder, and content-id"
+    (is (= "/tmp/out/psvita/PCSE00001"
+           (str (n/content-dir "/tmp/out" :psv_games "PCSE00001"))))
+    (is (= "/tmp/out/ps3/NPUB12345"
+           (str (n/content-dir "/tmp/out" :ps3_dlcs "NPUB12345")))))
+  (testing "unknown source falls back to the source name as folder"
+    (is (= "/tmp/out/unknown/X"
+           (str (n/content-dir "/tmp/out" :nothing "X"))))))
+

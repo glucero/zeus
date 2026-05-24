@@ -50,8 +50,15 @@
         (.write out ^bytes (fetch-bytes url))))
     cache-file))
 
-(defn- row-content-id [row]
+(defn content-id
+  "Get a row's content id, falling back to title id."
+  [row]
   (or (:content-id row) (:title-id row)))
+
+(defn display-name
+  "Get a row's display name, falling back to title."
+  [row]
+  (or (:name row) (:title row)))
 
 (defn build-lookup
   "Scan all per-content-type TSVs in `cache-dir` and merge them into a
@@ -63,10 +70,9 @@
        (if-not (.exists f)
          acc
          (reduce (fn [m row]
-                   (let [cid (row-content-id row)]
-                     (if cid
-                       (assoc m cid (assoc row :_source ct))
-                       m)))
+                   (if-let [cid (content-id row)]
+                     (assoc m cid (assoc row :_source ct))
+                     m))
                  acc
                  (read-tsv f)))))
    {}

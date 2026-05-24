@@ -189,11 +189,11 @@
     (flush)))
 
 (defn- download-one [{:keys [config]} item]
-  (let [content-id (or (:content-id item) (:title-id item) "unknown")
-        dir (naming/content-dir (:output_dir config) (:_source item) content-id)]
+  (let [cid (or (tsv/content-id item) "unknown")
+        dir (naming/content-dir (:output_dir config) (:_source item) cid)]
     (.mkdirs ^java.io.File dir)
     (println (c/color :dim "  ────────────────────────────"))
-    (println " " (c/color :bold "⬇") (or (:name item) (:title item)))
+    (println " " (c/color :bold "⬇") (tsv/display-name item))
     (when-let [pkg-file (pkg/download-pkg item dir {:progress-fn (progress-printer)})]
       (println)
       (println " " (c/color :green "✓ PKG:") (c/color :dim (.getName pkg-file))))
@@ -255,11 +255,11 @@
             :let [i (parse-index a (count last-results))]
             :when i
             :let [item (nth last-results i)
-                  cid (or (:content-id item) (:title-id item))
+                  cid (tsv/content-id item)
                   dir (naming/content-dir (:output_dir config)
                                           (:_source item) cid)]]
       (println (c/color :dim "  ────────────────────────────"))
-      (println " " (c/color :bold "📀") (or (:name item) cid))
+      (println " " (c/color :bold "📀") (or (tsv/display-name item) cid))
       (extract-item item dir)))
   session)
 
@@ -307,7 +307,7 @@
                     item (get lookup cid)]
               :when item
               :let [base (naming/content-base-name
-                          (or (:name item) (:title item)) cid)]
+                          (tsv/display-name item) cid)]
               ext ["pkg" "rap"]
               :let [old (io/file dir (str cid "." ext))]
               :when (.exists old)]
@@ -349,7 +349,7 @@
             size-bytes (:file-size item)
             pkg-url (:pkg-direct-link item)]
         (println " " (c/color :dim "────────────────────────────"))
-        (println " " (c/color :bold (or (:name item) (:title item) "")))
+        (println " " (c/color :bold (or (tsv/display-name item) "")))
         (println " " (c/color :dim "────────────────────────────"))
         (println "  Title ID:  " (c/color :cyan (or (:title-id item) "—")))
         (println "  Content ID:" (c/color :dim (or (:content-id item) "—")))
@@ -387,7 +387,7 @@
                      (inc i)
                      (c/color (c/platform-color plat) (name plat))
                      ct
-                     (or (:name row) (:title row) "")
+                     (or (tsv/display-name row) "")
                      (or (:region row) "")
                      (or (fmt/format-size (:file-size row)) "")))))
 

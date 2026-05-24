@@ -1,19 +1,15 @@
 (ns zeus.pkg
   (:require [babashka.http-client :as http]
             [clojure.java.io :as io]
-            [zeus.naming :as naming]))
+            [zeus.naming :as naming]
+            [zeus.tsv :as tsv]))
 
 (defn- missing-url? [url]
   (or (nil? url) (= "" url) (= "MISSING" url)))
 
-(defn- item-content-id [item]
-  (or (:content-id item) (:title-id item) "unknown"))
-
-(defn- item-name [item]
-  (or (:name item) (:title item)))
-
 (defn- pkg-filename [item]
-  (str (naming/content-base-name (item-name item) (item-content-id item))
+  (str (naming/content-base-name (tsv/display-name item)
+                                 (or (tsv/content-id item) "unknown"))
        ".pkg"))
 
 (defn- existing-pkg [dir]

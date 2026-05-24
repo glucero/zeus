@@ -1,7 +1,8 @@
 (ns zeus.license
   (:require [clojure.java.io :as io]
             [zeus.naming :as naming]
-            [zeus.platforms :as p])
+            [zeus.platforms :as p]
+            [zeus.tsv :as tsv])
   (:import (java.util Base64)
            (java.util.zip Inflater)))
 
@@ -54,12 +55,6 @@
     (.write out data))
   f)
 
-(defn- item-content-id [item]
-  (or (:content-id item) (:title-id item)))
-
-(defn- item-name [item]
-  (or (:name item) (:title item)))
-
 (defn write-license-file
   "Write the platform-appropriate license file for `item` into `dir`.
    Returns the file written, or nil when no license is needed/available."
@@ -72,8 +67,8 @@
 
       (:ps3 :psp)
       (when-let [data (decode-rap (:rap item))]
-        (let [base (naming/content-base-name (item-name item)
-                                             (item-content-id item))]
+        (let [base (naming/content-base-name (tsv/display-name item)
+                                             (tsv/content-id item))]
           (write-bytes (io/file dir (str base ".rap")) data)))
 
       nil)))

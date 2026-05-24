@@ -103,6 +103,29 @@
 (defn- write-fixture-tsv [dir filename content]
   (spit (doto (io/file dir filename) (-> (.getParentFile) (.mkdirs))) content))
 
+(deftest handle-license-all
+  (let [out-dir (temp-dir)
+        cache-dir (temp-dir)
+        valid-rap "0123456789abcdef0123456789abcdef"
+        _ (write-fixture-tsv cache-dir "ps3_games.tsv"
+                             (str "Content ID\tName\tRAP\nNPUB1\tCool Game\t"
+                                  valid-rap "\n"))
+        config {:output_dir (str out-dir) :cache_dir (str cache-dir)}
+        session (sess/new-session config)
+        item-dir (doto (io/file out-dir "ps3" "NPUB1") .mkdirs)]
+    (testing "writes missing license files"
+      (silenced cmd/handle-license-all session ["all"])
+      (let [names (set (map #(.getName %) (.listFiles item-dir)))]
+        (is (contains? names "Cool Game [NPUB1].rap"))))
+    (testing "skips items that already have a license"
+      (silenced cmd/handle-license-all session ["all"])
+      (let [raps (filter #(.endsWith (.getName %) ".rap")
+                         (.listFiles item-dir))]
+        (is (= 1 (count raps)))))
+    (testing "usage error without 'all'"
+      (let [out (with-out-str (cmd/handle-license-all session []))]
+        (is (str/includes? (str/lower-case out) "usage"))))))
+
 (deftest handle-fix
   (let [out-dir (temp-dir)
         cache-dir (temp-dir)

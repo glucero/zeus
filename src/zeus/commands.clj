@@ -218,6 +218,35 @@
       (.renameTo f target)
       target)))
 
+(defn- has-license? [^java.io.File dir]
+  (boolean
+   (or (.exists (io/file dir "work.bin"))
+       (some #(.endsWith (.getName %) ".rap")
+             (.listFiles dir)))))
+
+(defn handle-license-all
+  "Walk download dirs and write missing license files using build-lookup."
+  [{:keys [config] :as session} args]
+  (cond
+    (not= ["all"] (mapv str/lower-case args))
+    (println "  usage: license all")
+
+    :else
+    (let [lookup (tsv/build-lookup (:cache_dir config))
+          made (atom 0)]
+      (doseq [[plat dir] (content-dirs (:output_dir config))
+              :let [item (get lookup (.getName dir))]
+              :when (and item (not (has-license? dir)))]
+        (when (license/write-license-file (assoc item :_source (:_source item)) dir)
+          (swap! made inc)
+          (println " " (c/color :green "✓")
+                   (c/color (c/platform-color plat) (name plat))
+                   (c/color :dim (.getName dir)))))
+      (if (zero? @made)
+        (println " " (c/color :green "✓") "all downloads have licenses (or don't need them)")
+        (println "  created" (c/color :green (str @made)) "license(s)"))))
+  session)
+
 (defn handle-fix
   "Rename CONTENT_ID.pkg / CONTENT_ID.rap to '<Name> [CONTENT_ID].xxx'."
   [{:keys [config] :as session} args]

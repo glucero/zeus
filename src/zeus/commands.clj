@@ -221,7 +221,7 @@
 
 (defn- extract-item [item content-dir]
   (let [plat (p/platform-from-source (:_source item))
-        pkg-file (first (filter #(.endsWith (.getName %) ".pkg")
+        pkg-file (first (filter #(str/ends-with? (.getName %) ".pkg")
                                 (.listFiles ^java.io.File content-dir)))]
     (cond
       (nil? pkg-file)
@@ -266,7 +266,7 @@
 (defn- has-license? [^java.io.File dir]
   (boolean
    (or (.exists (io/file dir "work.bin"))
-       (some #(.endsWith (.getName %) ".rap")
+       (some #(str/ends-with? (.getName %) ".rap")
              (.listFiles dir)))))
 
 (defn handle-license-all

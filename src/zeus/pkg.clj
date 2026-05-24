@@ -1,6 +1,7 @@
 (ns zeus.pkg
   (:require [babashka.http-client :as http]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [zeus.naming :as naming]
             [zeus.tsv :as tsv]))
 
@@ -16,7 +17,7 @@
   (->> (.listFiles ^java.io.File dir)
        (filter (fn [^java.io.File f]
                  (and (.isFile f)
-                      (.endsWith (.getName f) ".pkg"))))
+                      (str/ends-with? (.getName f) ".pkg"))))
        first))
 
 (defn fetch-stream

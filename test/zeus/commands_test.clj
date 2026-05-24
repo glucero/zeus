@@ -152,7 +152,7 @@
         (is (contains? names "Cool Game [NPUB1].rap"))))
     (testing "skips items that already have a license"
       (silenced cmd/handle-license-all session ["all"])
-      (let [raps (filter #(.endsWith (.getName %) ".rap")
+      (let [raps (filter #(str/ends-with? (.getName %) ".rap")
                          (.listFiles item-dir))]
         (is (= 1 (count raps)))))
     (testing "usage error without 'all'"

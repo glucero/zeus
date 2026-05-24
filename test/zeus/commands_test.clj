@@ -100,6 +100,32 @@
         (silenced cmd/handle-sync session))
       (is (zero? @fetched)))))
 
+(defn- write-fixture-tsv [dir filename content]
+  (spit (doto (io/file dir filename) (-> (.getParentFile) (.mkdirs))) content))
+
+(deftest handle-fix
+  (let [out-dir (temp-dir)
+        cache-dir (temp-dir)
+        _ (write-fixture-tsv cache-dir "ps3_games.tsv"
+                             "Content ID\tName\nNPUB1\tCool Game\n")
+        config {:output_dir (str out-dir) :cache_dir (str cache-dir)}
+        session (sess/new-session config)
+        item-dir (doto (io/file out-dir "ps3" "NPUB1") .mkdirs)
+        _ (spit (io/file item-dir "NPUB1.pkg") "x")
+        _ (spit (io/file item-dir "NPUB1.rap") "y")]
+    (testing "renames CONTENT_ID-named files to the basename format"
+      (silenced cmd/handle-fix session ["all"])
+      (let [names (set (map #(.getName %) (.listFiles item-dir)))]
+        (is (contains? names "Cool Game [NPUB1].pkg"))
+        (is (contains? names "Cool Game [NPUB1].rap"))
+        (is (not (contains? names "NPUB1.pkg")))))
+    (testing "rerun is a no-op (already renamed)"
+      (silenced cmd/handle-fix session ["all"])
+      (is (= 2 (count (.listFiles item-dir)))))
+    (testing "usage error for missing 'all'"
+      (let [out (with-out-str (cmd/handle-fix session []))]
+        (is (str/includes? (str/lower-case out) "usage"))))))
+
 (deftest handle-download
   (let [out-dir (temp-dir)
         config {:output_dir (str out-dir)}

@@ -199,6 +199,54 @@
     (when-let [lic (license/write-license-file item dir)]
       (println " " (c/color :green "✓ license:") (c/color :dim (.getName lic))))))
 
+(defn- platform-dirs [output-dir]
+  (keep (fn [[plat folder]]
+          (let [d (io/file output-dir folder)]
+            (when (.isDirectory d) [plat d])))
+        p/platform-folders))
+
+(defn- content-dirs [output-dir]
+  (for [[plat d] (platform-dirs output-dir)
+        sub (.listFiles ^java.io.File d)
+        :when (.isDirectory sub)]
+    [plat sub]))
+
+(defn- rename-with-base [^java.io.File f new-base]
+  (let [ext (subs (.getName f) (.lastIndexOf (.getName f) "."))
+        target (io/file (.getParentFile f) (str new-base ext))]
+    (when-not (= f target)
+      (.renameTo f target)
+      target)))
+
+(defn handle-fix
+  "Rename CONTENT_ID.pkg / CONTENT_ID.rap to '<Name> [CONTENT_ID].xxx'."
+  [{:keys [config] :as session} args]
+  (cond
+    (not= ["all"] (mapv str/lower-case args))
+    (println "  usage: fix all")
+
+    :else
+    (let [lookup (tsv/build-lookup (:cache_dir config))
+          fixed (atom 0)]
+      (doseq [[_ dir] (content-dirs (:output_dir config))
+              :let [cid (.getName dir)
+                    item (get lookup cid)]
+              :when item
+              :let [base (naming/content-base-name
+                          (or (get item "Name") (get item "Title")) cid)]
+              ext ["pkg" "rap"]
+              :let [old (io/file dir (str cid "." ext))]
+              :when (.exists old)]
+        (when (rename-with-base old base)
+          (swap! fixed inc)
+          (println " " (c/color :green "renamed:")
+                   (c/color :dim (.getName old)) "→"
+                   (c/color :cyan (str base "." ext)))))
+      (if (zero? @fixed)
+        (println " " (c/color :green "✓") "all files already in expected naming format")
+        (println "  fixed" (c/color :green (str @fixed)) "file(s)"))))
+  session)
+
 (defn handle-download
   "Download PKG + license for each indexed item in last-results."
   [{:keys [last-results] :as session} args]

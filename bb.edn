@@ -1,7 +1,11 @@
 {:paths ["src" "test"]
  :deps {}
  :tasks
- {test {:doc "Run all tests"
+ {run  {:doc "Run zeus"
+        :override-builtin true
+        :requires ([zeus.core])
+        :task (apply zeus.core/-main *command-line-args*)}
+  test {:doc "Run all tests"
         :requires ([babashka.classpath :as cp]
                    [clojure.string :as str]
                    [clojure.test :as t])

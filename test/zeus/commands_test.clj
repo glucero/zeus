@@ -98,6 +98,31 @@
         (silenced cmd/handle-sync session))
       (is (zero? @fetched)))))
 
+(deftest handle-info
+  (let [session (-> (sess/new-session {})
+                    (sess/set-results
+                     [{:_source :ps3_games
+                       "Name" "Test Game" "Title ID" "BLUS00001"
+                       "Content ID" "NPUB12345" "Region" "US"
+                       "File Size" "1073741824"
+                       "PKG direct link" "http://x"
+                       "RAP" "0123456789abcdef0123456789abcdef"}]))]
+    (testing "prints details for valid index"
+      (let [out (with-out-str (cmd/handle-info session ["1"]))]
+        (is (str/includes? out "Test Game"))
+        (is (str/includes? out "NPUB12345"))
+        (is (str/includes? out "ps3"))
+        (is (str/includes? out "1.00 GB"))))
+    (testing "out-of-range index prints error"
+      (let [out (with-out-str (cmd/handle-info session ["5"]))]
+        (is (str/includes? (str/lower-case out) "invalid"))))
+    (testing "no args prints usage"
+      (let [out (with-out-str (cmd/handle-info session []))]
+        (is (str/includes? (str/lower-case out) "usage"))))
+    (testing "empty results prints helpful message"
+      (let [out (with-out-str (cmd/handle-info (sess/new-session {}) ["1"]))]
+        (is (str/includes? (str/lower-case out) "search"))))))
+
 (deftest handle-search
   (let [dir (temp-dir)
         _ (spit (io/file dir "ps3_games.tsv")

@@ -156,6 +156,59 @@
                           (name ct) "—" (.getMessage e)))))))
   session)
 
+(defn- parse-index [arg max-n]
+  (try
+    (let [i (dec (Long/parseLong arg))]
+      (when (and (>= i 0) (< i max-n)) i))
+    (catch NumberFormatException _ nil)))
+
+(defn- print-license-status [plat item]
+  (case plat
+    :psv (let [z (get item "zRIF")]
+           (println "  zRIF:      "
+                    (if (and z (not (#{"" "MISSING"} z)))
+                      (c/color :green "✓ available")
+                      (c/color :red "✗ missing"))))
+    (:ps3 :psp) (let [r (get item "RAP")]
+                  (println "  RAP:       "
+                           (cond
+                             (= "NOT REQUIRED" r) (c/color :dim "not required")
+                             (and r (not (#{"" "MISSING"} r))) (c/color :green "✓ available")
+                             :else (c/color :red "✗ missing"))))
+    nil))
+
+(defn handle-info
+  "Print full details for last-results[n-1]."
+  [{:keys [last-results] :as session} args]
+  (cond
+    (empty? args)        (println "  usage: info <number>")
+    (empty? last-results) (println "  no search results — run 'search' first")
+    :else
+    (if-let [idx (parse-index (first args) (count last-results))]
+      (let [item (nth last-results idx)
+            source (:_source item)
+            plat (p/platform-from-source source)
+            size-bytes (get item "File Size")
+            pkg-url (get item "PKG direct link")]
+        (println " " (c/color :dim "────────────────────────────"))
+        (println " " (c/color :bold (or (get item "Name") (get item "Title") "")))
+        (println " " (c/color :dim "────────────────────────────"))
+        (println "  Title ID:  " (c/color :cyan (or (get item "Title ID") "—")))
+        (println "  Content ID:" (c/color :dim (or (get item "Content ID") "—")))
+        (println "  Region:    " (or (get item "Region") "—"))
+        (println "  Platform:  " (c/color (c/platform-color plat) (name plat))
+                 (c/color :dim (str "(" (name source) ")")))
+        (when (seq size-bytes)
+          (println "  Size:      " (fmt/format-size size-bytes)))
+        (println "  PKG:       "
+                 (if (and pkg-url (not (#{"" "MISSING"} pkg-url)))
+                   (c/color :green "✓ available")
+                   (c/color :red "✗ missing")))
+        (print-license-status plat item)
+        (println " " (c/color :dim "────────────────────────────")))
+      (println " " (c/color :red "invalid number"))))
+  session)
+
 (defn- ensure-tsv
   "Ensure the TSV for `content-type` is on disk and return its file, or nil
    when no URL is configured / download fails."

@@ -124,3 +124,9 @@
       (is (= #{} (:selected-types s)))
       (is (= #{:us :eu :jp :asia} (:selected-regions s))))))
 
+(deftest set-refresh
+  (testing "sets the force-refresh? flag"
+    (let [s (sess/new-session {})]
+      (is (true?  (:force-refresh? (sess/set-refresh s true))))
+      (is (false? (:force-refresh? (sess/set-refresh s false)))))))
+

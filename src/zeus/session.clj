@@ -105,3 +105,8 @@
   (assoc session
          :selected-types #{}
          :selected-regions valid-regions))
+
+(defn set-refresh
+  "Toggle the force-refresh? flag."
+  [session on?]
+  (assoc session :force-refresh? (boolean on?)))

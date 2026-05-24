@@ -98,3 +98,21 @@
                 (sess/set-regions ["MARS"]))]
       (is (= #{:us} (:selected-regions s))))))
 
+(deftest prompt-str
+  (testing "no types selected, all regions"
+    (is (= "zeus[none]> " (sess/prompt-str (sess/new-session {})))))
+  (testing "single platform, all regions"
+    (let [s (sess/select-types (sess/new-session {}) ["ps3_games"])]
+      (is (= "zeus[ps3]> " (sess/prompt-str s)))))
+  (testing "platforms are sorted and comma-joined"
+    (let [s (sess/select-types (sess/new-session {}) ["psv_games" "ps3_games"])]
+      (is (= "zeus[ps3,psv]> " (sess/prompt-str s)))))
+  (testing "filtered regions are appended after a colon, uppercased"
+    (let [s (-> (sess/new-session {:session {:selected_regions ["US" "EU"]}})
+                (sess/select-types ["ps3"]))]
+      (is (= "zeus[ps3:EU,US]> " (sess/prompt-str s)))))
+  (testing "empty region set renders as 'no-region'"
+    (let [s (-> (sess/new-session {:session {:selected_regions []}})
+                (sess/select-types ["ps3"]))]
+      (is (= "zeus[ps3:no-region]> " (sess/prompt-str s))))))
+

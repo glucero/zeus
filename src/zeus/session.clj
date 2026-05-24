@@ -70,3 +70,31 @@
   [session args]
   (update session :selected-regions
           (fn [regs] (reduce apply-region-arg regs args))))
+
+(defn- platforms-part [selected-types]
+  (if (empty? selected-types)
+    "none"
+    (->> selected-types
+         (map p/platform-from-source)
+         (filter some?)
+         distinct
+         (map name)
+         sort
+         (str/join ","))))
+
+(defn- regions-part [selected-regions]
+  (cond
+    (= valid-regions selected-regions) nil
+    (empty? selected-regions)          "no-region"
+    :else                              (->> selected-regions
+                                            (map (comp str/upper-case name))
+                                            sort
+                                            (str/join ","))))
+
+(defn prompt-str
+  "Render the interactive prompt summarizing the current selection."
+  [{:keys [selected-types selected-regions]}]
+  (let [parts (cond-> [(platforms-part selected-types)]
+                (regions-part selected-regions)
+                (conj (regions-part selected-regions)))]
+    (str "zeus[" (str/join ":" parts) "]> ")))

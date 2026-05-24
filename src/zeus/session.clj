@@ -110,3 +110,9 @@
   "Toggle the force-refresh? flag."
   [session on?]
   (assoc session :force-refresh? (boolean on?)))
+
+(defn set-results
+  "Store the latest search results so commands like `info` and `download`
+   can refer to them by index."
+  [session results]
+  (assoc session :last-results (vec results)))

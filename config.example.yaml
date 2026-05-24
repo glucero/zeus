@@ -1,7 +1,16 @@
 output_dir: ./downloads
 cache_dir: ./cache
 cache_expiration_days: 7
-catalog_urls: {psv_games: 'https://nopaystation.com/tsv/PSV_GAMES.tsv', psv_updates: 'https://nopaystation.com/tsv/PSV_UPDATES.tsv', psv_dlcs: 'https://nopaystation.com/tsv/PSV_DLCS.tsv', ps3_games: 'https://nopaystation.com/tsv/PS3_GAMES.tsv', ps3_dlcs: 'https://nopaystation.com/tsv/PS3_DLCS.tsv', ps3_themes: 'https://nopaystation.com/tsv/PS3_THEMES.tsv', ps3_avatars: 'https://nopaystation.com/tsv/PS3_AVATARS.tsv', ps3_demos: 'https://nopaystation.com/tsv/PS3_DEMOS.tsv', psp_games: 'https://nopaystation.com/tsv/PSP_GAMES.tsv', psx_games: 'https://nopaystation.com/tsv/PSX_GAMES.tsv', psm_games: 'https://nopaystation.com/tsv/PSM_GAMES.tsv'}
-session:
-  selected_types: [ps3_avatars, ps3_demos, ps3_dlcs, ps3_games, ps3_themes]
-  selected_regions: [ASIA, EU, JP, US]
+
+catalog_urls:
+  psv_games:   https://nopaystation.com/tsv/PSV_GAMES.tsv
+  psv_updates: https://nopaystation.com/tsv/PSV_UPDATES.tsv
+  psv_dlcs:    https://nopaystation.com/tsv/PSV_DLCS.tsv
+  ps3_games:   https://nopaystation.com/tsv/PS3_GAMES.tsv
+  ps3_dlcs:    https://nopaystation.com/tsv/PS3_DLCS.tsv
+  ps3_themes:  https://nopaystation.com/tsv/PS3_THEMES.tsv
+  ps3_avatars: https://nopaystation.com/tsv/PS3_AVATARS.tsv
+  ps3_demos:   https://nopaystation.com/tsv/PS3_DEMOS.tsv
+  psp_games:   https://nopaystation.com/tsv/PSP_GAMES.tsv
+  psx_games:   https://nopaystation.com/tsv/PSX_GAMES.tsv
+  psm_games:   https://nopaystation.com/tsv/PSM_GAMES.tsv

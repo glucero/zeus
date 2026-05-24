@@ -1,8 +1,14 @@
 (ns zeus.commands-test
-  (:require [clojure.string :as str]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [zeus.commands :as cmd]
-            [zeus.session :as sess]))
+            [zeus.session :as sess]
+            [zeus.tsv :as tsv]))
+
+(defn- temp-dir []
+  (doto (java.io.File/createTempFile "zeus-cmd" "")
+    (.delete) (.mkdir) (.deleteOnExit)))
 
 (defn- silenced [f & args]
   (binding [*out* (java.io.StringWriter.)] (apply f args)))
@@ -63,3 +69,31 @@
     (let [s (-> (sess/new-session {:session {:selected_regions []}})
                 (->> (#(silenced cmd/handle-region % ["us" "eu"]))))]
       (is (= #{:us :eu} (:selected-regions s))))))
+
+(deftest handle-sync
+  (testing "downloads a TSV for each selected type"
+    (let [dir (temp-dir)
+          config {:cache_dir (str dir)
+                  :cache_expiration_days 7
+                  :catalog_urls {:ps3_games "http://x/ps3"
+                             :psv_games "http://x/psv"}}
+          session (-> (sess/new-session config)
+                      (sess/select-types ["ps3_games" "psv_games"]))
+          fetched (atom #{})]
+      (with-redefs [tsv/fetch-bytes (fn [url]
+                                      (swap! fetched conj url)
+                                      (.getBytes "x"))]
+        (silenced cmd/handle-sync session))
+      (is (= #{"http://x/ps3" "http://x/psv"} @fetched))
+      (is (.exists (io/file dir "ps3_games.tsv")))
+      (is (.exists (io/file dir "psv_games.tsv")))))
+  (testing "skips types with no URL in config"
+    (let [dir (temp-dir)
+          session (-> (sess/new-session
+                       {:cache_dir (str dir) :cache_expiration_days 7
+                        :catalog_urls {}})
+                      (sess/select-types ["ps3_games"]))
+          fetched (atom 0)]
+      (with-redefs [tsv/fetch-bytes (fn [_] (swap! fetched inc) (byte-array 0))]
+        (silenced cmd/handle-sync session))
+      (is (zero? @fetched)))))

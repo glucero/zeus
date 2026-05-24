@@ -1,8 +1,10 @@
 (ns zeus.commands
-  (:require [clojure.string :as str]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [zeus.colors :as c]
             [zeus.platforms :as p]
-            [zeus.session :as sess]))
+            [zeus.session :as sess]
+            [zeus.tsv :as tsv]))
 
 (defn- color-type [t]
   (c/color (c/platform-color (p/platform-from-source t)) (name t)))
@@ -122,3 +124,31 @@
                         (str/join ", " (sort (map (comp str/upper-case name)
                                                   (:selected-regions updated)))))))
     updated))
+
+(defn- cache-file-for [config content-type]
+  (io/file (:cache_dir config) (str (name content-type) ".tsv")))
+
+(defn- sync-one [{:keys [config force-refresh?]} content-type]
+  (if-let [url (get-in config [:catalog_urls content-type])]
+    (do (println " " (c/color :dim "⬇") (color-type content-type))
+        (tsv/download-tsv {:url url
+                           :cache-file (cache-file-for config content-type)
+                           :expiration-days (:cache_expiration_days config)
+                           :force? force-refresh?}))
+    (println " " (c/color :yellow "skipping") (color-type content-type)
+             (c/color :dim "(no URL configured)"))))
+
+(defn handle-sync
+  "Download/refresh the TSVs for every selected content type."
+  [{:keys [selected-types] :as session}]
+  (if (empty? selected-types)
+    (println " " (c/color :yellow "no content types selected"))
+    (do (println " " (c/color :bold "syncing")
+                 (c/color :cyan (str (count selected-types)))
+                 "database(s)")
+        (doseq [ct (sort selected-types)]
+          (try (sync-one session ct)
+               (catch Exception e
+                 (println " " (c/color :red "error syncing")
+                          (name ct) "—" (.getMessage e)))))))
+  session)

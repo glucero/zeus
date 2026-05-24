@@ -73,3 +73,28 @@
                 (sess/unselect-types ["nintendo"]))]
       (is (= 5 (count (:selected-types s)))))))
 
+(deftest set-regions
+  (testing "\"all\" sets every region"
+    (let [s (-> (sess/new-session {:session {:selected_regions []}})
+                (sess/set-regions ["all"]))]
+      (is (= #{:us :eu :jp :asia} (:selected-regions s)))))
+  (testing "\"clear\" empties the set"
+    (let [s (sess/set-regions (sess/new-session {}) ["clear"])]
+      (is (= #{} (:selected-regions s)))))
+  (testing "specific region toggles on when absent"
+    (let [s (-> (sess/new-session {:session {:selected_regions []}})
+                (sess/set-regions ["US"]))]
+      (is (= #{:us} (:selected-regions s)))))
+  (testing "specific region toggles off when present"
+    (let [s (-> (sess/new-session {:session {:selected_regions ["US" "EU"]}})
+                (sess/set-regions ["US"]))]
+      (is (= #{:eu} (:selected-regions s)))))
+  (testing "case-insensitive"
+    (let [s (-> (sess/new-session {:session {:selected_regions []}})
+                (sess/set-regions ["us" "Eu"]))]
+      (is (= #{:us :eu} (:selected-regions s)))))
+  (testing "unknown region is ignored"
+    (let [s (-> (sess/new-session {:session {:selected_regions ["US"]}})
+                (sess/set-regions ["MARS"]))]
+      (is (= #{:us} (:selected-regions s))))))
+

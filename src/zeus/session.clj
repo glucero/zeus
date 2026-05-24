@@ -55,3 +55,18 @@
   "Remove the content types named by `args` from the session's selection."
   [session args]
   (update session :selected-types set/difference (types-from-args args)))
+
+(defn- apply-region-arg [regions arg]
+  (let [k (-> arg str/lower-case keyword)]
+    (cond
+      (= :all k)         valid-regions
+      (= :clear k)       #{}
+      (valid-regions k)  (if (regions k) (disj regions k) (conj regions k))
+      :else              regions)))
+
+(defn set-regions
+  "Apply `args` to the session's region selection.
+   \"all\" / \"clear\" reset; specific regions toggle."
+  [session args]
+  (update session :selected-regions
+          (fn [regs] (reduce apply-region-arg regs args))))

@@ -45,13 +45,16 @@
 
 (defn dispatch
   "Run `cmd` against `session`. Returns ::exit for exit commands,
-   or {:session ..., :events [...]} from the matched handler."
+   or {:session ..., :events [...]} from the matched handler. Binds
+   cmd/*emit!* to view/render! so handlers can stream live events."
   [session cmd args]
   (cond
     (exit-commands cmd) ::exit
-    :else (if-let [handler (handlers cmd)]
-            (handler session args)
-            {:session session :events [[:unknown-command cmd]]})))
+    :else
+    (binding [cmd/*emit!* view/render!]
+      (if-let [handler (handlers cmd)]
+        (handler session args)
+        {:session session :events [[:unknown-command cmd]]}))))
 
 (defn- read-and-dispatch [session config-path]
   (print (sess/prompt-str session)) (flush)

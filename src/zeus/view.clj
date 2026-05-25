@@ -179,6 +179,13 @@
     :license-file      (c/say (c/color :green "✓ license:")
                               (c/color :dim (.getName ^java.io.File (first args))))
     :item-error        (c/say (c/color :red "error:") (first args))
+    :progress          (let [done (first args) total (second args)]
+                         (print (format "\r  progress: %.1f%% (%.1f/%.1f MB)"
+                                        (* 100.0 (/ done (double total)))
+                                        (/ done (* 1024.0 1024))
+                                        (/ total (* 1024.0 1024))))
+                         (flush))
+    :progress-done     (println)
     :extract-start     (do (render-rule)
                            (c/say (c/color :bold "📀")
                                   (or (tsv/display-name (first args))

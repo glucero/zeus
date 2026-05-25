@@ -1,7 +1,11 @@
 (ns zeus.commands
   "Command handlers. Each handler is pure-ish: takes [session args],
    returns {:session updated-session, :events [event-tuple ...]}.
-   The events vector is rendered by zeus.view; the session is the new state."
+   The events vector is rendered by zeus.view; the session is the new state.
+
+   For events that must reach the renderer *during* execution (e.g. download
+   progress), handlers call `(*emit!* event)`. The dispatcher binds *emit!*
+   to the live renderer; tests leave it as a noop."
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.string :as str]
@@ -12,6 +16,11 @@
             [zeus.search :as search]
             [zeus.session :as sess]
             [zeus.tsv :as tsv]))
+
+(def ^:dynamic *emit!*
+  "A function that the renderer can inject so handlers can stream events
+   live (e.g. download progress). Defaults to a noop."
+  (fn [_event] nil))
 
 (defn- result [session events]
   {:session session :events (vec events)})
@@ -86,13 +95,9 @@
       (result session [[:item-info (nth last-results idx)]])
       (result session [[:invalid-index]]))))
 
-(defn- progress-printer []
+(defn- progress-emitter []
   (fn [done total]
-    (print (format "\r  progress: %.1f%% (%.1f/%.1f MB)"
-                   (* 100.0 (/ done (double total)))
-                   (/ done (* 1024.0 1024))
-                   (/ total (* 1024.0 1024))))
-    (flush)))
+    (*emit!* [:progress done total])))
 
 (defn- download-one!
   "Download PKG + license for one item. Returns a seq of events."
@@ -100,10 +105,10 @@
   (let [cid (or (tsv/content-id item) "unknown")
         dir (naming/content-dir (:output_dir config) (:_source item) cid)
         _ (.mkdirs ^java.io.File dir)
-        pkg-file (pkg/download-pkg item dir {:progress-fn (progress-printer)})
+        pkg-file (pkg/download-pkg item dir {:progress-fn (progress-emitter)})
         lic (when pkg-file (license/write-license-file item dir))]
     (cond-> [[:download-start item]]
-      pkg-file (conj [:download-pkg pkg-file])
+      pkg-file (conj [:progress-done] [:download-pkg pkg-file])
       lic      (conj [:license-file lic]))))
 
 (defn handle-download [{:keys [last-results] :as session} args]

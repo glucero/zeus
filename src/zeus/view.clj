@@ -52,7 +52,8 @@
   -----------
   select   <type|platform|all>   Add content type(s) to search
   unselect <type|platform|all>   Remove content type(s) from search
-  region   <region|all|clear>    Toggle region filter (US, EU, JP, ASIA)
+  region   <region|all>          Add region(s) to filter (US, EU, JP, ASIA)
+  unregion <region|all>          Remove region(s) from filter
   search   <term>                Search selected content types
   info     <number>              Show detailed info for a result
   download <numbers>             Download PKG + license

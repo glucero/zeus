@@ -17,7 +17,7 @@
     {:config-path (:config options)}))
 
 (def ^:private mutating-commands
-  #{"select" "unselect" "region" "clear"})
+  #{"select" "unselect" "region" "unregion" "clear"})
 
 (defn mutating?
   "True when running `cmd` changes filters that should be persisted."
@@ -33,6 +33,7 @@
    "select"   cmd/handle-select
    "unselect" cmd/handle-unselect
    "region"   cmd/handle-region
+   "unregion" cmd/handle-unregion
    "search"   cmd/handle-search
    "info"     cmd/handle-info
    "download" cmd/handle-download

@@ -66,20 +66,31 @@
   [session args]
   (update session :selected-types set/difference (types-from-args args)))
 
-(defn- apply-region-arg [regions arg]
+(defn- resolve-regions-arg
+  "Convert a single region argument to a set of region keywords.
+   Accepts \"all\" or a specific region (case-insensitive).
+   Unknown args return an empty set."
+  [arg]
   (let [kw (-> arg str/lower-case keyword)]
     (cond
-      (= :all kw)        valid-regions
-      (= :clear kw)      #{}
-      (valid-regions kw) (if (regions kw) (disj regions kw) (conj regions kw))
-      :else              regions)))
+      (= :all kw)       valid-regions
+      (valid-regions kw) #{kw}
+      :else             #{})))
 
-(defn set-regions
-  "Apply `args` to the session's region selection.
-   \"all\" / \"clear\" reset; specific regions toggle."
+(defn- regions-from-args [args]
+  (reduce set/union #{} (map resolve-regions-arg args)))
+
+(defn add-regions
+  "Add the regions named by `args` to the session's region set.
+   `args` accepts specific regions or \"all\"; case-insensitive."
   [session args]
-  (update session :selected-regions
-          (fn [regions] (reduce apply-region-arg regions args))))
+  (update session :selected-regions set/union (regions-from-args args)))
+
+(defn remove-regions
+  "Remove the regions named by `args` from the session's region set.
+   `args` accepts specific regions or \"all\"; case-insensitive."
+  [session args]
+  (update session :selected-regions set/difference (regions-from-args args)))
 
 (defn- types-part [selected-types]
   (cond

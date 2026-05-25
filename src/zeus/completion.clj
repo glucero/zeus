@@ -1,27 +1,27 @@
 (ns zeus.completion
   (:require [clojure.string :as str]
-            [zeus.platforms :as p]))
+            [zeus.platforms :as platforms]))
 
 (def commands
-  ["select" "unselect" "region" "search" "download" "extract"
+  ["select" "unselect" "region" "unregion" "search" "download" "extract"
    "fix" "license" "info" "refresh" "status" "sync" "clear"
    "help" "exit" "quit"])
 
 (def ^:private select-options
   (concat ["all"]
-          (map name (keys p/platforms))
-          (map name p/content-types)))
+          (map name (keys platforms/platforms))
+          (map name platforms/content-types)))
 
 (def ^:private region-options
-  (concat ["all" "clear"]
-          (map (comp str/upper-case name) p/regions)))
+  (concat ["all"]
+          (map (comp str/upper-case name) platforms/regions)))
 
 (defn- options-at [position cmd]
   (case position
     0 commands
     1 (case cmd
-        ("select" "unselect") select-options
-        "region"              region-options
+        ("select" "unselect")   select-options
+        ("region" "unregion")   region-options
         [])
     []))
 
@@ -35,5 +35,5 @@
         committed (if trailing? tokens (vec (butlast tokens)))
         prefix    (if trailing? "" (or (peek tokens) ""))
         prefix-lc (str/lower-case prefix)]
-    (vec (filter (fn [o] (str/starts-with? (str/lower-case o) prefix-lc))
+    (vec (filter (fn [option] (str/starts-with? (str/lower-case option) prefix-lc))
                  (options-at (count committed) (first committed))))))

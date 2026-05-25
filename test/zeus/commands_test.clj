@@ -81,11 +81,25 @@
       (is (has-tag? out :types-removed)))))
 
 (deftest handle-region
-  (testing "updates regions; emits :regions-set with new set"
+  (testing "adds regions; emits :regions-set with new set"
     (let [out (-> (sess/new-session {:session {:selected-regions []}})
                   (cmd/handle-region ["us" "eu"]))]
       (is (= #{:us :eu} (:selected-regions (:session out))))
-      (is (= [[:regions-set #{:us :eu}]] (:events out))))))
+      (is (= [[:regions-set #{:us :eu}]] (:events out)))))
+  (testing "adding a region that's already present is a no-op"
+    (let [out (-> (sess/new-session {:session {:selected-regions ["US"]}})
+                  (cmd/handle-region ["us"]))]
+      (is (= #{:us} (:selected-regions (:session out)))))))
+
+(deftest handle-unregion
+  (testing "removes regions; emits :regions-set"
+    (let [out (-> (sess/new-session {})
+                  (cmd/handle-unregion ["us"]))]
+      (is (= #{:eu :jp :asia} (:selected-regions (:session out))))
+      (is (has-tag? out :regions-set))))
+  (testing "\"all\" clears every region"
+    (let [out (cmd/handle-unregion (sess/new-session {}) ["all"])]
+      (is (= #{} (:selected-regions (:session out)))))))
 
 (deftest handle-sync
   (testing "downloads a TSV for each selected type"

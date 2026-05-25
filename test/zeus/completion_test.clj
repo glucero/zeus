@@ -23,12 +23,14 @@
       (is (contains? out "ps3_games"))
       (is (contains? out "psv"))
       (is (not (contains? out "all")))))
-  (testing "after 'region ' offers regions plus all/clear"
+  (testing "after 'region ' offers regions plus 'all'"
     (let [out (set (cmp/complete "region "))]
       (is (contains? out "US"))
       (is (contains? out "EU"))
-      (is (contains? out "all"))
-      (is (contains? out "clear"))))
+      (is (contains? out "all"))))
+  (testing "after 'unregion ' offers the same options as 'region '"
+    (is (= (set (cmp/complete "region "))
+           (set (cmp/complete "unregion ")))))
   (testing "unrelated context returns empty"
     (is (= [] (cmp/complete "search metal "))))
   (testing "case-insensitive prefix match"

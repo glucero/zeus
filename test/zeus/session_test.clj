@@ -81,30 +81,40 @@
                 (sess/unselect-types ["nintendo"]))]
       (is (= 5 (count (:selected-types s)))))))
 
-(deftest set-regions
-  (testing "\"all\" sets every region"
+(deftest add-regions
+  (testing "\"all\" adds every region"
     (let [s (-> (sess/new-session {:session {:selected-regions []}})
-                (sess/set-regions ["all"]))]
+                (sess/add-regions ["all"]))]
       (is (= #{:us :eu :jp :asia} (:selected-regions s)))))
-  (testing "\"clear\" empties the set"
-    (let [s (sess/set-regions (sess/new-session {}) ["clear"])]
-      (is (= #{} (:selected-regions s)))))
-  (testing "specific region toggles on when absent"
+  (testing "specific region is added when absent"
     (let [s (-> (sess/new-session {:session {:selected-regions []}})
-                (sess/set-regions ["US"]))]
+                (sess/add-regions ["US"]))]
       (is (= #{:us} (:selected-regions s)))))
-  (testing "specific region toggles off when present"
+  (testing "specific region already present is a no-op (no toggle off)"
     (let [s (-> (sess/new-session {:session {:selected-regions ["US" "EU"]}})
-                (sess/set-regions ["US"]))]
-      (is (= #{:eu} (:selected-regions s)))))
+                (sess/add-regions ["US"]))]
+      (is (= #{:us :eu} (:selected-regions s)))))
   (testing "case-insensitive"
     (let [s (-> (sess/new-session {:session {:selected-regions []}})
-                (sess/set-regions ["us" "Eu"]))]
+                (sess/add-regions ["us" "Eu"]))]
       (is (= #{:us :eu} (:selected-regions s)))))
   (testing "unknown region is ignored"
     (let [s (-> (sess/new-session {:session {:selected-regions ["US"]}})
-                (sess/set-regions ["MARS"]))]
+                (sess/add-regions ["MARS"]))]
       (is (= #{:us} (:selected-regions s))))))
+
+(deftest remove-regions
+  (testing "\"all\" empties the set"
+    (let [s (sess/remove-regions (sess/new-session {}) ["all"])]
+      (is (= #{} (:selected-regions s)))))
+  (testing "specific region is removed when present"
+    (let [s (sess/remove-regions (sess/new-session {}) ["US"])]
+      (is (not (contains? (:selected-regions s) :us)))
+      (is (= #{:eu :jp :asia} (:selected-regions s)))))
+  (testing "specific region not present is a no-op"
+    (let [s (-> (sess/new-session {:session {:selected-regions ["EU"]}})
+                (sess/remove-regions ["US"]))]
+      (is (= #{:eu} (:selected-regions s))))))
 
 (deftest prompt-str
   (testing "all defaults render as bare 'zeus> '"

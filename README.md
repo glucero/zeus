@@ -36,7 +36,7 @@ To narrow to one platform or region:
 ```text
 zeus> unselect all
 zeus[no-type]> select ps3
-zeus[ps3]> region clear
+zeus[ps3]> unregion all
 zeus[ps3:no-region]> region us
 zeus[ps3:US]>
 ```

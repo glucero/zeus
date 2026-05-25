@@ -53,7 +53,11 @@
             (if (seq removed) [[:types-removed removed]] [[:types-no-change]]))))
 
 (defn handle-region [session args]
-  (let [updated (sess/set-regions session args)]
+  (let [updated (sess/add-regions session args)]
+    (result updated [[:regions-set (:selected-regions updated)]])))
+
+(defn handle-unregion [session args]
+  (let [updated (sess/remove-regions session args)]
     (result updated [[:regions-set (:selected-regions updated)]])))
 
 (defn- cache-file-for [config content-type]

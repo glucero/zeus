@@ -50,6 +50,47 @@ zeus[ps3:US]>
 Selections are persisted to a `session:` block in the YAML so the
 next launch resumes where you left off.
 
+## Example download
+
+Once you've narrowed to what you want, `info` shows the catalog row
+and `download` pulls the PKG and license file:
+
+```text
+zeus> search <some title>
+  found 1 result(s):
+    1. ps3 | games | EXAMPLE TITLE                       | US   |   4.21 GB
+zeus> info 1
+  ----------------------------
+  EXAMPLE TITLE
+  ----------------------------
+  Title ID:   NPUB99999
+  Content ID: ABCD-EFGH12345_00
+  Region:     US
+  Platform:   ps3 (ps3_games)
+  Size:       4.21 GB
+  PKG:        [ok] available
+  RAP:        [ok] available
+  ----------------------------
+zeus> download 1
+  progress: 100.0% (4310.5/4310.5 MB)
+  [ok] PKG:     EXAMPLE TITLE [ABCD-EFGH12345_00].pkg
+  [ok] license: EXAMPLE TITLE [ABCD-EFGH12345_00].rap
+```
+
+The PKG and `.rap` land under `downloads/<platform>/<content_id>/`:
+
+```text
+downloads/ps3/ABCD-EFGH12345_00/
+├── EXAMPLE TITLE [ABCD-EFGH12345_00].pkg
+└── EXAMPLE TITLE [ABCD-EFGH12345_00].rap
+```
+
+From there it's hardware or emulator: install the PKG on a real
+console via its package installer, or open it in an emulator
+(*File > Install Package* in RPCS3 / Vita3K). PSP and PSX PKGs
+need the `extract` step first to produce a disc image the emulator
+can load.
+
 For the architecture story behind this, see [WHY_IT_WORKS.md](WHY_IT_WORKS.md).
 
 ## Tasks

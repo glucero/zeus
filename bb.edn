@@ -1,10 +1,16 @@
 {:paths ["src" "test"]
  :deps {}
  :tasks
- {run  {:doc "Run zeus"
-        :override-builtin true
-        :requires ([zeus.core])
-        :task (apply zeus.core/-main *command-line-args*)}
+ {run      {:doc "Run zeus"
+            :override-builtin true
+            :requires ([zeus.core])
+            :task (apply zeus.core/-main *command-line-args*)}
+  complete {:doc "Print one completion per line for the given partial input"
+            :requires ([clojure.string :as str]
+                       [zeus.completion :as completion])
+            :task (let [line (str/join " " *command-line-args*)]
+                    (doseq [match (completion/complete line)]
+                      (println match)))}
   test {:doc "Run all tests"
         :requires ([babashka.classpath :as cp]
                    [clojure.string :as str]

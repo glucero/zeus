@@ -379,7 +379,10 @@
                          :cache-file (cache-file-for config content-type)
                          :expiration-days (:cache_expiration_days config)
                          :force? force-refresh?})
-      (catch Exception _ nil))))
+      (catch Exception e
+        (c/say (c/color :yellow "warning:") "could not load"
+               (color-type content-type) "—" (.getMessage e))
+        nil))))
 
 (defn- print-result-row [i row]
   (let [source (:_source row)

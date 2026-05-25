@@ -19,6 +19,14 @@
 (defn- has-tag? [outcome tag]
   (some #{tag} (ev-tags outcome)))
 
+(defn- empty-session
+  "Session with all selections explicitly cleared (for tests that exercise
+   narrowing from a blank slate)."
+  [& [extra-config]]
+  (sess/new-session (merge {:session {:selected-types []
+                                      :selected-regions []}}
+                           extra-config)))
+
 (deftest handle-status
   (testing "returns session unchanged"
     (let [s (sess/new-session {})]
@@ -48,28 +56,27 @@
       (is (= [[:refresh-state true]] (:events out))))))
 
 (deftest handle-clear
-  (testing "drops selections; emits :cleared"
-    (let [out (-> (sess/new-session {:session {:selected-regions ["US"]}})
-                  (sess/select-types ["ps3"])
+  (testing "resets selections to defaults; emits :cleared"
+    (let [out (-> (sess/new-session {:session {:selected-types ["ps3_games"]
+                                               :selected-regions ["US"]}})
                   (cmd/handle-clear))]
-      (is (= #{} (:selected-types (:session out))))
+      (is (= 11 (count (:selected-types (:session out)))))
       (is (= #{:us :eu :jp :asia} (:selected-regions (:session out))))
       (is (= [[:cleared]] (:events out))))))
 
 (deftest handle-select
-  (testing "adds types; emits :types-added"
-    (let [out (cmd/handle-select (sess/new-session {}) ["ps3"])]
+  (testing "adds types from an empty starting set; emits :types-added"
+    (let [out (cmd/handle-select (empty-session) ["ps3"])]
       (is (= 5 (count (:selected-types (:session out)))))
       (is (has-tag? out :types-added))))
   (testing "no-op emits :types-no-change"
-    (let [s (sess/select-types (sess/new-session {}) ["ps3"])
+    (let [s (sess/select-types (empty-session) ["ps3"])
           out (cmd/handle-select s ["nintendo"])]
       (is (= [[:types-no-change]] (:events out))))))
 
 (deftest handle-unselect
   (testing "removes types; emits :types-removed"
-    (let [s (sess/select-types (sess/new-session {}) ["all"])
-          out (cmd/handle-unselect s ["psm"])]
+    (let [out (cmd/handle-unselect (sess/new-session {}) ["psm"])]
       (is (not (contains? (:selected-types (:session out)) :psm_games)))
       (is (has-tag? out :types-removed)))))
 
@@ -96,7 +103,7 @@
       (is (= #{"http://x/ps3" "http://x/psv"} @fetched))
       (is (.exists (io/file dir "ps3_games.tsv")))))
   (testing "no selected types emits :no-types-selected"
-    (let [out (cmd/handle-sync (sess/new-session {}))]
+    (let [out (cmd/handle-sync (empty-session))]
       (is (= [[:no-types-selected]] (:events out))))))
 
 (deftest handle-info
@@ -239,6 +246,6 @@
         (is (= ["Persona"] (map :name (:last-results (:session out)))))))
     (testing "no selected types"
       (is (= [[:no-types-selected]]
-             (:events (cmd/handle-search (sess/new-session config) ["x"])))))
+             (:events (cmd/handle-search (empty-session config) ["x"])))))
     (testing "empty search args yields :usage"
       (is (has-tag? (cmd/handle-search session []) :usage)))))

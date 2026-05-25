@@ -14,13 +14,21 @@
               (filter valid-set))
         xs))
 
+(defn- restore-or-default
+  "When `saved` is nil (key absent from config), return the full default set
+   so the user starts with nothing filtered out. When `saved` is an explicit
+   empty list, return an empty set (intentional opt-out). Otherwise filter
+   `saved` down to the valid members."
+  [valid-set saved]
+  (if (nil? saved)
+    valid-set
+    (valid-keywords valid-set saved)))
+
 (defn- restore-types [saved]
-  (valid-keywords valid-types saved))
+  (restore-or-default valid-types saved))
 
 (defn- restore-regions [saved]
-  (if (nil? saved)
-    valid-regions
-    (valid-keywords valid-regions saved)))
+  (restore-or-default valid-regions saved))
 
 (defn new-session
   "Build a fresh session map from a loaded config.
@@ -73,16 +81,17 @@
   (update session :selected-regions
           (fn [regions] (reduce apply-region-arg regions args))))
 
-(defn- platforms-part [selected-types]
-  (if (empty? selected-types)
-    "none"
-    (->> selected-types
-         (map platforms/platform-from-source)
-         (filter some?)
-         distinct
-         (map name)
-         sort
-         (str/join ","))))
+(defn- types-part [selected-types]
+  (cond
+    (= valid-types selected-types) nil
+    (empty? selected-types)        "no-type"
+    :else                          (->> selected-types
+                                        (map platforms/platform-from-source)
+                                        (filter some?)
+                                        distinct
+                                        (map name)
+                                        sort
+                                        (str/join ","))))
 
 (defn- regions-part [selected-regions]
   (cond
@@ -94,18 +103,29 @@
                                             (str/join ","))))
 
 (defn prompt-str
-  "Render the interactive prompt summarizing the current selection."
+  "Render the interactive prompt summarizing the current selection.
+   When both types and regions are at full default, the brackets are
+   omitted entirely (`zeus> `). When one side is at default and the other
+   is narrowed, only the narrowed side appears (`zeus[ps3]> `, `zeus[US]> `).
+   When both are narrowed, both appear separated by a colon."
   [{:keys [selected-types selected-regions]}]
-  (let [parts (cond-> [(platforms-part selected-types)]
-                (regions-part selected-regions)
-                (conj (regions-part selected-regions)))]
-    (str "zeus[" (str/join ":" parts) "]> ")))
+  (let [types-str   (types-part selected-types)
+        regions-str (regions-part selected-regions)]
+    (cond
+      (and (nil? types-str) (nil? regions-str))
+      "zeus> "
+
+      (and types-str regions-str)
+      (str "zeus[" types-str ":" regions-str "]> ")
+
+      :else
+      (str "zeus[" (or types-str regions-str) "]> "))))
 
 (defn clear-selections
-  "Drop all selected types and restore the full set of regions."
+  "Reset both selections back to the defaults (all types, all regions)."
   [session]
   (assoc session
-         :selected-types #{}
+         :selected-types valid-types
          :selected-regions valid-regions))
 
 (defn set-refresh

@@ -36,6 +36,8 @@ zeus[ps3:US]> exit
 Selections are persisted to a `session:` block in the YAML so the
 next launch resumes where you left off.
 
+For the architecture story behind this, see [WHY_IT_WORKS.md](WHY_IT_WORKS.md).
+
 ## Tasks
 
 - `bb run [--config PATH]` launches the browser

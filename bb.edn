@@ -11,6 +11,24 @@
             :task (let [line (str/join " " *command-line-args*)]
                     (doseq [match (completion/complete line)]
                       (println match)))}
+  firmware {:doc "Download system firmware (PS3 / PSV) from Sony's CDN"
+            :requires ([clojure.java.io :as io]
+                       [zeus.firmware :as firmware])
+            :task (let [[platform target-dir] *command-line-args*
+                        dir (io/file (or target-dir (str "./firmware/" platform)))
+                        progress (fn [done total]
+                                   (print (format "\r  progress: %.1f%% (%.1f/%.1f MB)"
+                                                  (* 100.0 (/ done (double total)))
+                                                  (/ done (* 1024.0 1024))
+                                                  (/ total (* 1024.0 1024))))
+                                   (flush))]
+                    (if (nil? platform)
+                      (do (binding [*out* *err*]
+                            (println "usage: bb firmware <ps3|psv> [target-dir]"))
+                          (System/exit 1))
+                      (let [f (firmware/fetch platform dir :progress-fn progress)]
+                        (println)
+                        (println (str "  [ok] " (.getPath f))))))}
   test {:doc "Run all tests"
         :requires ([babashka.classpath :as cp]
                    [clojure.string :as str]

@@ -1,10 +1,10 @@
 (ns zeus.session
   (:require [clojure.set :as set]
             [clojure.string :as str]
-            [zeus.platforms :as p]))
+            [zeus.platforms :as platforms]))
 
-(def ^:private valid-types (set p/content-types))
-(def ^:private valid-regions (set p/regions))
+(def ^:private valid-types (set platforms/content-types))
+(def ^:private valid-regions (set platforms/regions))
 
 (defn- valid-keywords
   "Lowercase + keywordize each item in xs, keep only those in valid-set."
@@ -38,12 +38,12 @@
    Accepts \"all\", a platform name, or a specific content type; case-insensitive.
    Unknown args return an empty set."
   [arg]
-  (let [k (-> arg str/lower-case keyword)]
+  (let [kw (-> arg str/lower-case keyword)]
     (cond
-      (= :all k)            (set p/content-types)
-      (contains? p/platforms k) (set (get p/platforms k))
-      (valid-types k)       #{k}
-      :else                 #{})))
+      (= :all kw)                        (set platforms/content-types)
+      (contains? platforms/platforms kw) (set (get platforms/platforms kw))
+      (valid-types kw)                   #{kw}
+      :else                              #{})))
 
 (defn- types-from-args [args]
   (reduce set/union #{} (map resolve-types-arg args)))
@@ -59,11 +59,11 @@
   (update session :selected-types set/difference (types-from-args args)))
 
 (defn- apply-region-arg [regions arg]
-  (let [k (-> arg str/lower-case keyword)]
+  (let [kw (-> arg str/lower-case keyword)]
     (cond
-      (= :all k)         valid-regions
-      (= :clear k)       #{}
-      (valid-regions k)  (if (regions k) (disj regions k) (conj regions k))
+      (= :all kw)        valid-regions
+      (= :clear kw)      #{}
+      (valid-regions kw) (if (regions kw) (disj regions kw) (conj regions kw))
       :else              regions)))
 
 (defn set-regions
@@ -71,13 +71,13 @@
    \"all\" / \"clear\" reset; specific regions toggle."
   [session args]
   (update session :selected-regions
-          (fn [regs] (reduce apply-region-arg regs args))))
+          (fn [regions] (reduce apply-region-arg regions args))))
 
 (defn- platforms-part [selected-types]
   (if (empty? selected-types)
     "none"
     (->> selected-types
-         (map p/platform-from-source)
+         (map platforms/platform-from-source)
          (filter some?)
          distinct
          (map name)

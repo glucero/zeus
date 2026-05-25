@@ -9,6 +9,6 @@
   (if (nil? size)
     nil
     (try
-      (let [n (Long/parseLong size)]
-        (format "%.2f GB" (/ (double n) bytes-per-gb)))
+      (let [byte-count (Long/parseLong size)]
+        (format "%.2f GB" (/ (double byte-count) bytes-per-gb)))
       (catch NumberFormatException _ size))))

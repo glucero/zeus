@@ -1,5 +1,5 @@
 (ns zeus.extract
-  (:require [babashka.process :as p]
+  (:require [babashka.process :as process]
             [clojure.java.io :as io]
             [clojure.string :as str]))
 
@@ -7,8 +7,8 @@
   "Locate `binary` on PATH, returning its absolute path or nil."
   [binary]
   (->> (str/split (or (System/getenv "PATH") "") #":")
-       (map (fn [d] (io/file d binary)))
-       (filter (fn [f] (and (.isFile f) (.canExecute f))))
+       (map (fn [path-dir] (io/file path-dir binary)))
+       (filter (fn [file] (and (.isFile file) (.canExecute file))))
        first
        (#(some-> % .getAbsolutePath))))
 
@@ -16,16 +16,16 @@
   "Run an external command. Returns true on exit 0.
    `args` is a vector of strings; `opts` may include :dir."
   [args opts]
-  (let [{:keys [exit]} (apply p/shell
+  (let [{:keys [exit]} (apply process/shell
                               (merge {:dir (some-> (:dir opts) str)
                                       :continue true}
                                      (dissoc opts :dir))
                               args)]
     (zero? exit)))
 
-(defn- find-first [^java.io.File dir glob]
-  (let [pat (re-pattern (str "(?i)" glob))]
-    (first (filter (fn [f] (re-find pat (.getName f)))
+(defn- find-first [^java.io.File dir name-regex]
+  (let [pattern (re-pattern (str "(?i)" name-regex))]
+    (first (filter (fn [file] (re-find pattern (.getName file)))
                    (file-seq dir)))))
 
 (defn extract-psp

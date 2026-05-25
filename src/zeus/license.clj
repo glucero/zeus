@@ -1,7 +1,7 @@
 (ns zeus.license
   (:require [clojure.java.io :as io]
             [zeus.naming :as naming]
-            [zeus.platforms :as p]
+            [zeus.platforms :as platforms]
             [zeus.tsv :as tsv])
   (:import (java.util Base64)
            (java.util.zip Inflater)))
@@ -16,27 +16,28 @@
              (not (sentinels rap-hex))
              (= 32 (count rap-hex)))
     (try
-      (let [out (byte-array 16)]
+      (let [decoded (byte-array 16)]
         (dotimes [i 16]
-          (let [b (Integer/parseInt (subs rap-hex (* i 2) (+ 2 (* i 2))) 16)]
-            (aset-byte out i (unchecked-byte b))))
-        out)
+          (let [byte-value (Integer/parseInt
+                            (subs rap-hex (* i 2) (+ 2 (* i 2))) 16)]
+            (aset-byte decoded i (unchecked-byte byte-value))))
+        decoded)
       (catch NumberFormatException _ nil))))
 
 (defn- inflate
   "Decompress a zlib byte array. Returns nil on failure."
   [^bytes compressed]
   (let [inflater (Inflater.)
-        buf (byte-array 4096)
-        out (java.io.ByteArrayOutputStream.)]
+        buffer (byte-array 4096)
+        out-stream (java.io.ByteArrayOutputStream.)]
     (.setInput inflater compressed)
     (try
       (while (not (.finished inflater))
-        (let [n (.inflate inflater buf)]
-          (when (zero? n)
+        (let [bytes-written (.inflate inflater buffer)]
+          (when (zero? bytes-written)
             (throw (ex-info "inflate stalled" {})))
-          (.write out buf 0 n)))
-      (.toByteArray out)
+          (.write out-stream buffer 0 bytes-written)))
+      (.toByteArray out-stream)
       (catch Exception _ nil)
       (finally (.end inflater)))))
 
@@ -49,18 +50,18 @@
       (inflate (.decode (Base64/getDecoder) zrif))
       (catch IllegalArgumentException _ nil))))
 
-(defn- write-bytes [^java.io.File f ^bytes data]
-  (io/make-parents f)
-  (with-open [out (io/output-stream f)]
+(defn- write-bytes [^java.io.File file ^bytes data]
+  (io/make-parents file)
+  (with-open [out (io/output-stream file)]
     (.write out data))
-  f)
+  file)
 
 (defn write-license-file
   "Write the platform-appropriate license file for `item` into `dir`.
    Returns the file written, or nil when no license is needed/available."
   [item dir]
-  (let [plat (p/platform-from-source (:_source item))]
-    (case plat
+  (let [platform (platforms/platform-from-source (:_source item))]
+    (case platform
       (:psv :psm)
       (when-let [data (decode-zrif (:zrif item))]
         (write-bytes (io/file dir "work.bin") data))

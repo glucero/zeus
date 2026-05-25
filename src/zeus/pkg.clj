@@ -15,9 +15,9 @@
 
 (defn- existing-pkg [dir]
   (->> (.listFiles ^java.io.File dir)
-       (filter (fn [^java.io.File f]
-                 (and (.isFile f)
-                      (str/ends-with? (.getName f) ".pkg"))))
+       (filter (fn [^java.io.File file]
+                 (and (.isFile file)
+                      (str/ends-with? (.getName file) ".pkg"))))
        first))
 
 (defn fetch-stream
@@ -32,15 +32,15 @@
    each chunk. Returns the total bytes written."
   [^java.io.InputStream in ^java.io.File file total chunk-size progress-fn]
   (with-open [out (io/output-stream file)]
-    (let [buf (byte-array chunk-size)]
+    (let [buffer (byte-array chunk-size)]
       (loop [downloaded 0]
-        (let [n (.read in buf)]
-          (if (neg? n)
+        (let [bytes-read (.read in buffer)]
+          (if (neg? bytes-read)
             downloaded
-            (do (.write out buf 0 n)
-                (let [done (+ downloaded n)]
-                  (when (and total progress-fn) (progress-fn done total))
-                  (recur done)))))))))
+            (do (.write out buffer 0 bytes-read)
+                (let [new-total (+ downloaded bytes-read)]
+                  (when (and total progress-fn) (progress-fn new-total total))
+                  (recur new-total)))))))))
 
 (defn download-pkg
   "Download `item`'s PKG into `dir`. Returns the file written (or any
@@ -56,14 +56,14 @@
     (when-not (missing-url? url)
       (.mkdirs ^java.io.File (io/file dir))
       (or (existing-pkg dir)
-          (let [filename (pkg-filename item)
-                final    (io/file dir filename)
-                partial  (io/file dir (str filename ".partial"))
+          (let [filename     (pkg-filename item)
+                final-file   (io/file dir filename)
+                partial-file (io/file dir (str filename ".partial"))
                 {:keys [body headers]} (fetch-stream url {:timeout timeout})
-                total    (some-> (or (get headers "content-length")
-                                     (get headers "Content-Length"))
-                                 Long/parseLong)]
+                total-bytes  (some-> (or (get headers "content-length")
+                                         (get headers "Content-Length"))
+                                     Long/parseLong)]
             (with-open [in body]
-              (stream-to-file in partial total chunk-size progress-fn))
-            (.renameTo partial final)
-            final)))))
+              (stream-to-file in partial-file total-bytes chunk-size progress-fn))
+            (.renameTo partial-file final-file)
+            final-file)))))

@@ -172,8 +172,9 @@
    :tsv-warning       (fn [content-type msg]
                         (c/say (c/color :yellow "warning:") "could not load"
                                (color-type content-type) "-" msg))
-   :sync-start        (fn [n] (c/say (c/color :bold "syncing")
-                                     (c/color :cyan (str n)) "database(s)"))
+   :sync-start        (fn [database-count]
+                        (c/say (c/color :bold "syncing")
+                               (c/color :cyan (str database-count)) "database(s)"))
    :sync-one          (fn [content-type] (c/say (c/color :dim ">") (color-type content-type)))
    :sync-skip         (fn [content-type] (c/say (c/color :yellow "skipping")
                                                 (color-type content-type)
@@ -204,14 +205,16 @@
                                (c/color :cyan (.getName target))))
    :fix-nothing       (fn [] (c/say (c/color :green "[ok]")
                                     "all files already in expected naming format"))
-   :fix-summary       (fn [n] (c/say "fixed" (c/color :green (str n)) "file(s)"))
+   :fix-summary       (fn [rename-count]
+                        (c/say "fixed" (c/color :green (str rename-count)) "file(s)"))
    :license-created   (fn [plat ^java.io.File dir]
                         (c/say (c/color :green "[ok]")
                                (c/color (c/platform-color plat) (name plat))
                                (c/color :dim (.getName dir))))
    :license-nothing   (fn [] (c/say (c/color :green "[ok]")
                                     "all downloads have licenses (or don't need them)"))
-   :license-summary   (fn [n] (c/say "created" (c/color :green (str n)) "license(s)"))})
+   :license-summary   (fn [license-count]
+                        (c/say "created" (c/color :green (str license-count)) "license(s)"))})
 
 (defn render!
   "Render one event tuple to stdout. Unknown tags are silently ignored."

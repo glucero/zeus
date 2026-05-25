@@ -3,13 +3,13 @@
             [clojure.data.csv :as csv]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [zeus.platforms :as p]))
+            [zeus.platforms :as platforms]))
 
 (defn header->key
   "Convert a TSV header label to an idiomatic kebab-case keyword.
    Example: \"PKG direct link\" -> :pkg-direct-link."
-  [s]
-  (-> s str/lower-case (str/replace #"\s+" "-") keyword))
+  [header]
+  (-> header str/lower-case (str/replace #"\s+" "-") keyword))
 
 (def ^:private day-ms (* 24 60 60 1000))
 
@@ -26,10 +26,10 @@
   "Read a tab-separated file into a vector of maps with kebab-case
    keyword keys derived from the header row."
   [file]
-  (with-open [r (io/reader file)]
-    (let [[header & rows] (csv/read-csv r :separator \tab)
-          ks (mapv header->key header)]
-      (mapv #(zipmap ks %) (vec rows)))))
+  (with-open [reader (io/reader file)]
+    (let [[header & rows] (csv/read-csv reader :separator \tab)
+          keys (mapv header->key header)]
+      (mapv #(zipmap keys %) (vec rows)))))
 
 (defn fetch-bytes
   "Fetch the URL and return the response body as a byte array.
@@ -65,15 +65,15 @@
    {content-id -> row} map. Each row is tagged with :_source."
   [cache-dir]
   (reduce
-   (fn [acc ct]
-     (let [f (io/file cache-dir (str (name ct) ".tsv"))]
-       (if-not (.exists f)
-         acc
-         (reduce (fn [m row]
+   (fn [lookup content-type]
+     (let [tsv-file (io/file cache-dir (str (name content-type) ".tsv"))]
+       (if-not (.exists tsv-file)
+         lookup
+         (reduce (fn [acc row]
                    (if-let [cid (content-id row)]
-                     (assoc m cid (assoc row :_source ct))
-                     m))
-                 acc
-                 (read-tsv f)))))
+                     (assoc acc cid (assoc row :_source content-type))
+                     acc))
+                 lookup
+                 (read-tsv tsv-file)))))
    {}
-   p/content-types))
+   platforms/content-types))

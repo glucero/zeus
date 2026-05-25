@@ -28,8 +28,8 @@
 
 (def handlers
   "Map of command name to a (fn [session args]) handler."
-  {"help"     (fn [s _] (cmd/handle-help s))
-   "status"   (fn [s _] (cmd/handle-status s))
+  {"help"     (fn [session _] (cmd/handle-help session))
+   "status"   (fn [session _] (cmd/handle-status session))
    "select"   cmd/handle-select
    "unselect" cmd/handle-unselect
    "region"   cmd/handle-region
@@ -39,9 +39,9 @@
    "extract"  cmd/handle-extract
    "fix"      cmd/handle-fix
    "license"  cmd/handle-license-all
-   "sync"     (fn [s _] (cmd/handle-sync s))
+   "sync"     (fn [session _] (cmd/handle-sync session))
    "refresh"  cmd/handle-refresh
-   "clear"    (fn [s _] (cmd/handle-clear s))})
+   "clear"    (fn [session _] (cmd/handle-clear session))})
 
 (defn dispatch
   "Run `cmd` against `session`. Returns ::exit for exit commands,
@@ -81,13 +81,13 @@
   (let [config (cfg/load-config config-path)]
     (view/render! [:banner])
     (loop [session (sess/new-session config)]
-      (let [next (try (read-and-dispatch session config-path)
-                      (catch Exception e
-                        (view/render! [:repl-error (.getMessage e)])
-                        session))]
+      (let [next-state (try (read-and-dispatch session config-path)
+                            (catch Exception e
+                              (view/render! [:repl-error (.getMessage e)])
+                              session))]
         (cond
-          (= ::exit next) (view/render! [:goodbye])
-          :else (recur next))))))
+          (= ::exit next-state) (view/render! [:goodbye])
+          :else (recur next-state))))))
 
 (defn -main
   "Entry point."

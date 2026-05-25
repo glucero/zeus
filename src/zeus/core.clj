@@ -23,29 +23,36 @@
   [cmd]
   (contains? mutating-commands cmd))
 
+(def exit-commands #{"exit" "quit"})
+
+(def handlers
+  "Map of command name to a (fn [session args]) handler."
+  {"help"     (fn [s _] (cmd/handle-help s))
+   "status"   (fn [s _] (cmd/handle-status s))
+   "select"   cmd/handle-select
+   "unselect" cmd/handle-unselect
+   "region"   cmd/handle-region
+   "search"   cmd/handle-search
+   "info"     cmd/handle-info
+   "download" cmd/handle-download
+   "extract"  cmd/handle-extract
+   "fix"      cmd/handle-fix
+   "license"  cmd/handle-license-all
+   "sync"     (fn [s _] (cmd/handle-sync s))
+   "refresh"  cmd/handle-refresh
+   "clear"    (fn [s _] (cmd/handle-clear s))})
+
 (defn dispatch
   "Run `cmd` against `session`. Returns the updated session,
    or ::exit when the user asked to quit."
   [session cmd args]
-  (case cmd
-    ("exit" "quit") ::exit
-    "help"     (cmd/handle-help session)
-    "status"   (cmd/handle-status session)
-    "select"   (cmd/handle-select session args)
-    "unselect" (cmd/handle-unselect session args)
-    "region"   (cmd/handle-region session args)
-    "search"   (cmd/handle-search session args)
-    "info"     (cmd/handle-info session args)
-    "download" (cmd/handle-download session args)
-    "extract"  (cmd/handle-extract session args)
-    "fix"      (cmd/handle-fix session args)
-    "license"  (cmd/handle-license-all session args)
-    "sync"     (cmd/handle-sync session)
-    "refresh"  (cmd/handle-refresh session args)
-    "clear"    (cmd/handle-clear session)
-    (do (c/say (c/color :red "unknown command:") cmd
-                 (c/color :dim "(try 'help')"))
-        session)))
+  (cond
+    (exit-commands cmd) ::exit
+    :else (if-let [handler (handlers cmd)]
+            (handler session args)
+            (do (c/say (c/color :red "unknown command:") cmd
+                       (c/color :dim "(try 'help')"))
+                session))))
 
 (defn- read-and-dispatch [session config-path]
   (print (sess/prompt-str session)) (flush)

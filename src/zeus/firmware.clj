@@ -3,6 +3,9 @@
             [clojure.java.io :as io]
             [clojure.string :as str]))
 
+(def psv-pup-url
+  "http://dus01.psv.update.playstation.net/update/psv/image/2022_0209/rel_f2c7b12fe85496ec88a0391b514d6e3b/PSVUPDAT.PUP")
+
 (def ps3-updatelist-url
   "http://dus01.ps3.update.playstation.net/update/ps3/list/us/ps3-updatelist.txt")
 
@@ -55,3 +58,21 @@
       (stream-to-file in partial total chunk-size progress-fn))
     (.renameTo partial file)
     file))
+
+(defn fetch
+  "Download firmware for `platform` (\"ps3\" or \"psv\") into `dir`.
+   Returns the written file.
+
+   opts:
+     :progress-fn (fn [done total])"
+  [platform dir & {:as opts}]
+  (let [d (io/file dir)]
+    (case platform
+      "ps3" (let [url (ps3-pup-url)]
+              (when-not url
+                (throw (ex-info "Could not find PS3UPDAT.PUP in update list"
+                                {:list-url ps3-updatelist-url})))
+              (download url (io/file d "PS3UPDAT.PUP") opts))
+      "psv" (download psv-pup-url (io/file d "PSVUPDAT.PUP") opts)
+      (throw (ex-info (str "Unknown firmware platform: " platform)
+                      {:platform platform :supported ["ps3" "psv"]})))))

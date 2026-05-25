@@ -43,3 +43,21 @@
         (firmware/download "http://x" f {:progress-fn progress :chunk-size 2}))
       (is (seq @calls))
       (is (= [6 6] (last @calls))))))
+
+(deftest fetch
+  (testing "psv writes PSVUPDAT.PUP into the target dir"
+    (let [d (temp-dir)]
+      (with-redefs [firmware/fetch-stream (fake-stream "FAKE-PSV-PUP")]
+        (let [f (firmware/fetch "psv" d)]
+          (is (= "PSVUPDAT.PUP" (.getName f)))
+          (is (= "FAKE-PSV-PUP" (slurp f)))))))
+  (testing "ps3 resolves URL via update list, then writes PS3UPDAT.PUP"
+    (let [d (temp-dir)]
+      (with-redefs [firmware/fetch-text   (fn [_] fake-updatelist)
+                    firmware/fetch-stream (fake-stream "FAKE-PS3-PUP")]
+        (let [f (firmware/fetch "ps3" d)]
+          (is (= "PS3UPDAT.PUP" (.getName f)))
+          (is (= "FAKE-PS3-PUP" (slurp f)))))))
+  (testing "unknown platform throws"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (firmware/fetch "psp" (temp-dir))))))

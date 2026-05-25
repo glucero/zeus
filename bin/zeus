@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# zeus -- thin wrapper that hands off to `bb run`.
+# Runs from the repo root so bb.edn is found regardless of cwd.
+set -e
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec bb --config "$HERE/bb.edn" run "$@"

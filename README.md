@@ -19,6 +19,12 @@ cp config.example.yaml config.yaml
 bb run --config config.yaml
 ```
 
+Or symlink `bin/zeus` onto your `PATH` and use it directly:
+
+```sh
+zeus --config config.yaml
+```
+
 Everything is selected by default, so search works immediately:
 
 ```text

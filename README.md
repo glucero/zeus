@@ -51,6 +51,7 @@ For the architecture story behind this, see [WHY_IT_WORKS.md](WHY_IT_WORKS.md).
 - `bb run [--config PATH]` launches the browser
 - `bb test` runs the test suite
 - `bb complete '<line>'` prints shell completions for a partial input
+- `bb firmware <ps3|psv> [dir]` downloads the system PUP from Sony's CDN
 
 ## Caching
 
@@ -64,6 +65,23 @@ Downloaded PKGs land in `output_dir/<platform>/<content_id>/`.
 To actually run what you download, install on a real console or use
 an emulator: [RPCS3](https://rpcs3.net/) (PS3), [Vita3K](https://vita3k.org/) (PSV / PSM),
 [PPSSPP](https://www.ppsspp.org/) (PSP), [DuckStation](https://www.duckstation.org/) (PSX, after `extract`).
+
+## Firmware
+
+RPCS3 and Vita3K need the original Sony system PUPs to boot. Both
+are still served from Sony's CDN; `bb firmware` fetches them
+straight from there:
+
+- `bb firmware ps3` resolves the latest PS3 firmware via Sony's
+  update-list endpoint and downloads `PS3UPDAT.PUP` to
+  `./firmware/ps3/`. Install in RPCS3 via *File > Install Firmware*.
+- `bb firmware psv` downloads the final PSV firmware (3.74) to
+  `./firmware/psv/PSVUPDAT.PUP`. Install in Vita3K via
+  *File > Install Firmware*.
+
+PPSSPP ships its own PSP firmware, so nothing to fetch. PS1 BIOS
+files for DuckStation are not distributed by Sony; they have to
+come from a real PS1 / PS2 / PS3 you own.
 
 ## License
 

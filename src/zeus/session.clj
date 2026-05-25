@@ -27,8 +27,8 @@
    Saved :session filters are restored; otherwise sensible defaults apply."
   [config]
   {:config config
-   :selected-types (restore-types (get-in config [:session :selected_types]))
-   :selected-regions (restore-regions (get-in config [:session :selected_regions]))
+   :selected-types (restore-types (get-in config [:session :selected-types]))
+   :selected-regions (restore-regions (get-in config [:session :selected-regions]))
    :force-refresh? false
    :last-results []
    :page-size 20})

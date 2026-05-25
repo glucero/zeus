@@ -49,7 +49,7 @@
 
 (deftest handle-clear
   (testing "drops selections; emits :cleared"
-    (let [out (-> (sess/new-session {:session {:selected_regions ["US"]}})
+    (let [out (-> (sess/new-session {:session {:selected-regions ["US"]}})
                   (sess/select-types ["ps3"])
                   (cmd/handle-clear))]
       (is (= #{} (:selected-types (:session out))))
@@ -75,7 +75,7 @@
 
 (deftest handle-region
   (testing "updates regions; emits :regions-set with new set"
-    (let [out (-> (sess/new-session {:session {:selected_regions []}})
+    (let [out (-> (sess/new-session {:session {:selected-regions []}})
                   (cmd/handle-region ["us" "eu"]))]
       (is (= #{:us :eu} (:selected-regions (:session out))))
       (is (= [[:regions-set #{:us :eu}]] (:events out))))))
@@ -83,9 +83,9 @@
 (deftest handle-sync
   (testing "downloads a TSV for each selected type"
     (let [dir (temp-dir)
-          config {:cache_dir (str dir)
-                  :cache_expiration_days 7
-                  :catalog_urls {:ps3_games "http://x/ps3"
+          config {:cache-dir (str dir)
+                  :cache-expiration-days 7
+                  :catalog-urls {:ps3_games "http://x/ps3"
                              :psv_games "http://x/psv"}}
           session (-> (sess/new-session config)
                       (sess/select-types ["ps3_games" "psv_games"]))
@@ -119,7 +119,7 @@
 
 (deftest handle-download
   (let [out-dir (temp-dir)
-        config {:output_dir (str out-dir)}
+        config {:output-dir (str out-dir)}
         item {:_source :ps3_games
               :name "Test" :content-id "NPUB1"
               :pkg-direct-link "http://x/x.pkg"
@@ -148,7 +148,7 @@
         item-dir (doto (io/file out-dir "psp" "UCUS001") .mkdirs)
         _ (spit (io/file item-dir "game.pkg") "x")
         item {:_source :psp_games :name "PSP Game" :content-id "UCUS001"}
-        session (-> (sess/new-session {:output_dir (str out-dir)})
+        session (-> (sess/new-session {:output-dir (str out-dir)})
                     (sess/set-results [item]))]
     (testing "psp item dispatches to extract-psp; emits :extract-ok"
       (with-redefs [ex/extract-psp (fn [_ dir]
@@ -159,7 +159,7 @@
       (let [psx-dir (doto (io/file out-dir "psx" "SCUS001") .mkdirs)
             _ (spit (io/file psx-dir "x.pkg") "x")
             psx-item {:_source :psx_games :content-id "SCUS001"}
-            sess  (-> (sess/new-session {:output_dir (str out-dir)})
+            sess  (-> (sess/new-session {:output-dir (str out-dir)})
                       (sess/set-results [psx-item]))
             called (atom 0)]
         (with-redefs [ex/extract-psx (fn [_ _] (swap! called inc) nil)]
@@ -176,7 +176,7 @@
         cache-dir (temp-dir)
         _ (write-fixture-tsv cache-dir "ps3_games.tsv"
                              "Content ID\tName\nNPUB1\tCool Game\n")
-        config {:output_dir (str out-dir) :cache_dir (str cache-dir)}
+        config {:output-dir (str out-dir) :cache-dir (str cache-dir)}
         session (sess/new-session config)
         item-dir (doto (io/file out-dir "ps3" "NPUB1") .mkdirs)
         _ (spit (io/file item-dir "NPUB1.pkg") "x")
@@ -200,7 +200,7 @@
         _ (write-fixture-tsv cache-dir "ps3_games.tsv"
                              (str "Content ID\tName\tRAP\nNPUB1\tCool Game\t"
                                   valid-rap "\n"))
-        config {:output_dir (str out-dir) :cache_dir (str cache-dir)}
+        config {:output-dir (str out-dir) :cache-dir (str cache-dir)}
         session (sess/new-session config)
         item-dir (doto (io/file out-dir "ps3" "NPUB1") .mkdirs)]
     (testing "writes missing licenses; emits :license-created + summary"
@@ -221,9 +221,9 @@
                 "Name\tRegion\tContent ID\tFile Size\nMetal Gear\tUS\tNPUB1\t1073741824\nPersona\tJP\tNPJB2\t2147483648\n")
         _ (spit (io/file dir "psv_games.tsv")
                 "Name\tRegion\tContent ID\tFile Size\nUncharted\tUS\tPCSE1\t1500000000\n")
-        config {:cache_dir (str dir)
-                :cache_expiration_days 7
-                :catalog_urls {:ps3_games "http://x/ps3"
+        config {:cache-dir (str dir)
+                :cache-expiration-days 7
+                :catalog-urls {:ps3_games "http://x/ps3"
                            :psv_games "http://x/psv"}}
         session (-> (sess/new-session config)
                     (sess/select-types ["ps3_games" "psv_games"]))]

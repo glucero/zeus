@@ -57,16 +57,16 @@
     (result updated [[:regions-set (:selected-regions updated)]])))
 
 (defn- cache-file-for [config content-type]
-  (io/file (:cache_dir config) (str (name content-type) ".tsv")))
+  (io/file (:cache-dir config) (str (name content-type) ".tsv")))
 
 (defn- sync-one!
   "Download a single TSV. Returns an event describing the outcome."
   [{:keys [config force-refresh?]} content-type]
-  (if-let [url (get-in config [:catalog_urls content-type])]
+  (if-let [url (get-in config [:catalog-urls content-type])]
     (try
       (tsv/download-tsv {:url url
                          :cache-file (cache-file-for config content-type)
-                         :expiration-days (:cache_expiration_days config)
+                         :expiration-days (:cache-expiration-days config)
                          :force? force-refresh?})
       [:sync-one content-type]
       (catch Exception e
@@ -103,7 +103,7 @@
   "Download PKG + license for one item. Returns a seq of events."
   [{:keys [config]} item]
   (let [cid (or (tsv/content-id item) "unknown")
-        dir (naming/content-dir (:output_dir config) (:_source item) cid)
+        dir (naming/content-dir (:output-dir config) (:_source item) cid)
         _ (.mkdirs ^java.io.File dir)
         pkg-file (pkg/download-pkg item dir {:progress-fn (progress-emitter)})
         lic (when pkg-file (license/write-license-file item dir))]
@@ -129,7 +129,7 @@
   [{:keys [config]} item]
   (let [plat (p/platform-from-source (:_source item))
         cid (tsv/content-id item)
-        dir (naming/content-dir (:output_dir config) (:_source item) cid)
+        dir (naming/content-dir (:output-dir config) (:_source item) cid)
         pkg-file (first (filter #(str/ends-with? (.getName %) ".pkg")
                                 (.listFiles ^java.io.File dir)))]
     (cond
@@ -182,9 +182,9 @@
 (defn handle-fix [{:keys [config] :as session} args]
   (if (not= ["all"] (mapv str/lower-case args))
     (result session [[:usage "fix all"]])
-    (let [lookup (tsv/build-lookup (:cache_dir config))
+    (let [lookup (tsv/build-lookup (:cache-dir config))
           renames (doall
-                   (for [[_ dir] (content-dirs (:output_dir config))
+                   (for [[_ dir] (content-dirs (:output-dir config))
                          :let [cid (.getName dir) item (get lookup cid)]
                          :when item
                          :let [base (naming/content-base-name
@@ -209,9 +209,9 @@
 (defn handle-license-all [{:keys [config] :as session} args]
   (if (not= ["all"] (mapv str/lower-case args))
     (result session [[:usage "license all"]])
-    (let [lookup (tsv/build-lookup (:cache_dir config))
+    (let [lookup (tsv/build-lookup (:cache-dir config))
           created (doall
-                   (for [[plat dir] (content-dirs (:output_dir config))
+                   (for [[plat dir] (content-dirs (:output-dir config))
                          :let [item (get lookup (.getName dir))]
                          :when (and item (not (has-license? dir)))
                          :let [out (license/write-license-file item dir)]
@@ -228,12 +228,12 @@
    Returns {:file f} on success, {:warn [ct msg]} on failure,
    or nil when no URL is configured."
   [{:keys [config force-refresh?]} content-type]
-  (when-let [url (get-in config [:catalog_urls content-type])]
+  (when-let [url (get-in config [:catalog-urls content-type])]
     (try
       {:file (tsv/download-tsv
               {:url url
                :cache-file (cache-file-for config content-type)
-               :expiration-days (:cache_expiration_days config)
+               :expiration-days (:cache-expiration-days config)
                :force? force-refresh?})}
       (catch Exception e
         {:warn [content-type (.getMessage e)]}))))

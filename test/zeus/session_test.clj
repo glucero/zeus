@@ -11,19 +11,19 @@
       (is (= [] (:last-results s)))))
   (testing "restores saved filters from config :session"
     (let [s (sess/new-session
-             {:session {:selected_types ["ps3_games" "psv_dlcs"]
-                        :selected_regions ["US" "EU"]}})]
+             {:session {:selected-types ["ps3_games" "psv_dlcs"]
+                        :selected-regions ["US" "EU"]}})]
       (is (= #{:ps3_games :psv_dlcs} (:selected-types s)))
       (is (= #{:us :eu} (:selected-regions s)))))
   (testing "ignores unknown saved types/regions"
     (let [s (sess/new-session
-             {:session {:selected_types ["ps3_games" "bogus"]
-                        :selected_regions ["US" "MARS"]}})]
+             {:session {:selected-types ["ps3_games" "bogus"]
+                        :selected-regions ["US" "MARS"]}})]
       (is (= #{:ps3_games} (:selected-types s)))
       (is (= #{:us} (:selected-regions s)))))
   (testing "explicit empty saved regions persists empty (matches nothing)"
     (let [s (sess/new-session
-             {:session {:selected_regions []}})]
+             {:session {:selected-regions []}})]
       (is (= #{} (:selected-regions s))))))
 
 (deftest select-types
@@ -75,26 +75,26 @@
 
 (deftest set-regions
   (testing "\"all\" sets every region"
-    (let [s (-> (sess/new-session {:session {:selected_regions []}})
+    (let [s (-> (sess/new-session {:session {:selected-regions []}})
                 (sess/set-regions ["all"]))]
       (is (= #{:us :eu :jp :asia} (:selected-regions s)))))
   (testing "\"clear\" empties the set"
     (let [s (sess/set-regions (sess/new-session {}) ["clear"])]
       (is (= #{} (:selected-regions s)))))
   (testing "specific region toggles on when absent"
-    (let [s (-> (sess/new-session {:session {:selected_regions []}})
+    (let [s (-> (sess/new-session {:session {:selected-regions []}})
                 (sess/set-regions ["US"]))]
       (is (= #{:us} (:selected-regions s)))))
   (testing "specific region toggles off when present"
-    (let [s (-> (sess/new-session {:session {:selected_regions ["US" "EU"]}})
+    (let [s (-> (sess/new-session {:session {:selected-regions ["US" "EU"]}})
                 (sess/set-regions ["US"]))]
       (is (= #{:eu} (:selected-regions s)))))
   (testing "case-insensitive"
-    (let [s (-> (sess/new-session {:session {:selected_regions []}})
+    (let [s (-> (sess/new-session {:session {:selected-regions []}})
                 (sess/set-regions ["us" "Eu"]))]
       (is (= #{:us :eu} (:selected-regions s)))))
   (testing "unknown region is ignored"
-    (let [s (-> (sess/new-session {:session {:selected_regions ["US"]}})
+    (let [s (-> (sess/new-session {:session {:selected-regions ["US"]}})
                 (sess/set-regions ["MARS"]))]
       (is (= #{:us} (:selected-regions s))))))
 
@@ -108,17 +108,17 @@
     (let [s (sess/select-types (sess/new-session {}) ["psv_games" "ps3_games"])]
       (is (= "zeus[ps3,psv]> " (sess/prompt-str s)))))
   (testing "filtered regions are appended after a colon, uppercased"
-    (let [s (-> (sess/new-session {:session {:selected_regions ["US" "EU"]}})
+    (let [s (-> (sess/new-session {:session {:selected-regions ["US" "EU"]}})
                 (sess/select-types ["ps3"]))]
       (is (= "zeus[ps3:EU,US]> " (sess/prompt-str s)))))
   (testing "empty region set renders as 'no-region'"
-    (let [s (-> (sess/new-session {:session {:selected_regions []}})
+    (let [s (-> (sess/new-session {:session {:selected-regions []}})
                 (sess/select-types ["ps3"]))]
       (is (= "zeus[ps3:no-region]> " (sess/prompt-str s))))))
 
 (deftest clear-selections
   (testing "drops all selected types and restores all regions"
-    (let [s (-> (sess/new-session {:session {:selected_regions ["US"]}})
+    (let [s (-> (sess/new-session {:session {:selected-regions ["US"]}})
                 (sess/select-types ["ps3"])
                 (sess/clear-selections))]
       (is (= #{} (:selected-types s)))

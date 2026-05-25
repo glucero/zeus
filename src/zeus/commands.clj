@@ -278,18 +278,19 @@
 
     :else
     (let [lookup (tsv/build-lookup (:cache_dir config))
-          made (atom 0)]
-      (doseq [[plat dir] (content-dirs (:output_dir config))
-              :let [item (get lookup (.getName dir))]
-              :when (and item (not (has-license? dir)))]
-        (when (license/write-license-file (assoc item :_source (:_source item)) dir)
-          (swap! made inc)
-          (c/say (c/color :green "✓")
-                   (c/color (c/platform-color plat) (name plat))
-                   (c/color :dim (.getName dir)))))
-      (if (zero? @made)
+          created (doall
+                   (for [[plat dir] (content-dirs (:output_dir config))
+                         :let [item (get lookup (.getName dir))]
+                         :when (and item (not (has-license? dir)))
+                         :let [out (license/write-license-file item dir)]
+                         :when out]
+                     (do (c/say (c/color :green "✓")
+                                (c/color (c/platform-color plat) (name plat))
+                                (c/color :dim (.getName dir)))
+                         out)))]
+      (if (empty? created)
         (c/say (c/color :green "✓") "all downloads have licenses (or don't need them)")
-        (println "  created" (c/color :green (str @made)) "license(s)"))))
+        (c/say "created" (c/color :green (str (count created))) "license(s)"))))
   session)
 
 (defn handle-fix
@@ -301,24 +302,25 @@
 
     :else
     (let [lookup (tsv/build-lookup (:cache_dir config))
-          fixed (atom 0)]
-      (doseq [[_ dir] (content-dirs (:output_dir config))
-              :let [cid (.getName dir)
-                    item (get lookup cid)]
-              :when item
-              :let [base (naming/content-base-name
-                          (tsv/display-name item) cid)]
-              ext ["pkg" "rap"]
-              :let [old (io/file dir (str cid "." ext))]
-              :when (.exists old)]
-        (when (rename-with-base old base)
-          (swap! fixed inc)
-          (c/say (c/color :green "renamed:")
-                   (c/color :dim (.getName old)) "→"
-                   (c/color :cyan (str base "." ext)))))
-      (if (zero? @fixed)
+          renamed (doall
+                   (for [[_ dir] (content-dirs (:output_dir config))
+                         :let [cid (.getName dir)
+                               item (get lookup cid)]
+                         :when item
+                         :let [base (naming/content-base-name
+                                     (tsv/display-name item) cid)]
+                         ext ["pkg" "rap"]
+                         :let [old (io/file dir (str cid "." ext))]
+                         :when (.exists old)
+                         :let [target (rename-with-base old base)]
+                         :when target]
+                     (do (c/say (c/color :green "renamed:")
+                                (c/color :dim (.getName old)) "→"
+                                (c/color :cyan (.getName target)))
+                         target)))]
+      (if (empty? renamed)
         (c/say (c/color :green "✓") "all files already in expected naming format")
-        (println "  fixed" (c/color :green (str @fixed)) "file(s)"))))
+        (c/say "fixed" (c/color :green (str (count renamed))) "file(s)"))))
   session)
 
 (defn handle-download

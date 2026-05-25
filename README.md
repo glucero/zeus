@@ -19,18 +19,26 @@ cp config.example.yaml config.yaml
 bb run --config config.yaml
 ```
 
-Inside the prompt:
+Everything is selected by default, so search works immediately:
 
 ```text
-zeus[none]> select ps3                   # turn on PS3 content types
-zeus[ps3]> region us                     # toggle US region on
-zeus[ps3:US]> sync                       # download catalog TSVs
-zeus[ps3:US]> search <title>          # search across cached TSVs
-zeus[ps3:US]> info 1                     # details for result #1
-zeus[ps3:US]> download 1                 # PKG + license for #1
-zeus[ps3:US]> extract 1                  # PSP/PSX: pkg2zip / psxtract
-zeus[ps3:US]> help
-zeus[ps3:US]> exit
+zeus> sync                               # download every catalog
+zeus> search <title>                     # search across everything
+zeus> info 1                             # details for result #1
+zeus> download 1                         # PKG + license for #1
+zeus> exit
+```
+
+The bare `zeus> ` prompt means nothing is narrowed.
+
+To narrow to one platform or region:
+
+```text
+zeus> unselect all
+zeus[no-type]> select ps3
+zeus[ps3]> region clear
+zeus[ps3:no-region]> region us
+zeus[ps3:US]>
 ```
 
 Selections are persisted to a `session:` block in the YAML so the

@@ -1,19 +1,20 @@
 (ns zeus.core
   (:require [clojure.string :as str]
+            [clojure.tools.cli :as cli]
             [zeus.colors :as c]
             [zeus.commands :as cmd]
             [zeus.config :as cfg]
             [zeus.session :as sess]))
 
+(def cli-options
+  [["-c" "--config PATH" "Path to YAML config file"
+    :default "config.yaml"]])
+
 (defn parse-args
   "Parse top-level CLI args. Recognizes --config <path>."
   [argv]
-  (loop [opts {:config-path "config.yaml"} args argv]
-    (cond
-      (empty? args) opts
-      (= "--config" (first args))
-      (recur (assoc opts :config-path (second args)) (drop 2 args))
-      :else (recur opts (rest args)))))
+  (let [{:keys [options]} (cli/parse-opts argv cli-options)]
+    {:config-path (:config options)}))
 
 (def ^:private mutating-commands
   #{"select" "unselect" "region" "clear"})

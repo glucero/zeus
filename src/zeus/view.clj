@@ -27,12 +27,12 @@
   (c/say (c/color (level->color level :white) msg)))
 
 (defn- render-rule []
-  (c/say (c/color :dim "────────────────────────────")))
+  (c/say (c/color :dim (apply str (repeat 28 \-)))))
 
 (defn- render-status [{:keys [selected-types selected-regions force-refresh?]}]
   (println)
   (c/say (c/color :bold "Current Settings"))
-  (c/say (c/color :dim "─────────────────"))
+  (c/say (c/color :dim (apply str (repeat 17 \-))))
   (if (empty? selected-types)
     (println "  Content:" (c/color :dim "none (use 'select' to add)"))
     (println "  Content:" (joined-types selected-types)))
@@ -51,7 +51,7 @@
 (def ^:private help-text
   "
   Commands
-  ───────────
+  -----------
   select   <type|platform|all>   Add content type(s) to search
   unselect <type|platform|all>   Remove content type(s) from search
   region   <region|all|clear>    Toggle region filter (US, EU, JP, ASIA)
@@ -73,7 +73,7 @@
   (let [source (:_source row)
         plat (p/platform-from-source source)
         ct (last (str/split (name source) #"_"))]
-    (println (format "  %3d. %s │ %s │ %-40s │ %-4s │ %9s"
+    (println (format "  %3d. %s | %s | %-40s | %-4s | %9s"
                      (inc i)
                      (c/color (c/platform-color plat) (name plat))
                      ct
@@ -91,14 +91,14 @@
     :psv (let [z (:zrif item)]
            (println "  zRIF:      "
                     (if (and z (not (#{"" "MISSING"} z)))
-                      (c/color :green "✓ available")
-                      (c/color :red "✗ missing"))))
+                      (c/color :green "[ok] available")
+                      (c/color :red "[!] missing"))))
     (:ps3 :psp) (let [r (:rap item)]
                   (println "  RAP:       "
                            (cond
                              (= "NOT REQUIRED" r) (c/color :dim "not required")
-                             (and r (not (#{"" "MISSING"} r))) (c/color :green "✓ available")
-                             :else (c/color :red "✗ missing"))))
+                             (and r (not (#{"" "MISSING"} r))) (c/color :green "[ok] available")
+                             :else (c/color :red "[!] missing"))))
     nil))
 
 (defn- render-item-info [item]
@@ -109,17 +109,17 @@
     (render-rule)
     (c/say (c/color :bold (or (tsv/display-name item) "")))
     (render-rule)
-    (println "  Title ID:  " (c/color :cyan (or (:title-id item) "—")))
-    (println "  Content ID:" (c/color :dim (or (:content-id item) "—")))
-    (println "  Region:    " (or (:region item) "—"))
+    (println "  Title ID:  " (c/color :cyan (or (:title-id item) "-")))
+    (println "  Content ID:" (c/color :dim (or (:content-id item) "-")))
+    (println "  Region:    " (or (:region item) "-"))
     (println "  Platform:  " (c/color (c/platform-color plat) (name plat))
              (c/color :dim (str "(" (name source) ")")))
     (when (seq size-bytes)
       (println "  Size:      " (fmt/format-size size-bytes)))
     (println "  PKG:       "
              (if (and pkg-url (not (#{"" "MISSING"} pkg-url)))
-               (c/color :green "✓ available")
-               (c/color :red "✗ missing")))
+               (c/color :green "[ok] available")
+               (c/color :red "[!] missing")))
     (render-license-status plat item)
     (render-rule)))
 
@@ -131,10 +131,10 @@
     :rule              (render-rule)
     :banner            (do (println)
                            (c/say (c/color :bold "zeus")
-                                  "— NoPayStation Interactive Browser")
+                                  "- Interactive Browser")
                            (c/say (c/color :dim "type 'help' for commands, 'exit' to quit"))
                            (println))
-    :goodbye           (c/say (c/color :dim "👋 goodbye"))
+    :goodbye           (c/say (c/color :dim "goodbye"))
     :say               (apply render-say args)
     :status            (render-status (first args))
     :help              (println help-text)
@@ -154,7 +154,7 @@
                                                      (joined-regions regs)))))
     :usage             (c/say (c/color :dim (str "usage: " (first args))))
     :no-types-selected (c/say (c/color :yellow "no content types selected"))
-    :no-search-results (c/say "no search results — run 'search' first")
+    :no-search-results (c/say "no search results - run 'search' first")
     :no-results        (c/say (c/color :yellow "no results"))
     :invalid-index     (c/say (c/color :red "invalid number"))
     :unknown-command   (c/say (c/color :red "unknown command:") (first args)
@@ -164,19 +164,19 @@
     :results           (render-results (first args))
     :item-info         (render-item-info (first args))
     :tsv-warning       (c/say (c/color :yellow "warning:") "could not load"
-                              (color-type (first args)) "—" (second args))
+                              (color-type (first args)) "-" (second args))
     :sync-start        (c/say (c/color :bold "syncing")
                               (c/color :cyan (str (first args))) "database(s)")
-    :sync-one          (c/say (c/color :dim "⬇") (color-type (first args)))
+    :sync-one          (c/say (c/color :dim ">") (color-type (first args)))
     :sync-skip         (c/say (c/color :yellow "skipping") (color-type (first args))
                               (c/color :dim "(no URL configured)"))
     :sync-error        (c/say (c/color :red "error syncing")
-                              (name (first args)) "—" (second args))
+                              (name (first args)) "-" (second args))
     :download-start    (do (render-rule)
-                           (c/say (c/color :bold "⬇") (tsv/display-name (first args))))
-    :download-pkg      (c/say (c/color :green "✓ PKG:")
+                           (c/say (c/color :bold ">") (tsv/display-name (first args))))
+    :download-pkg      (c/say (c/color :green "[ok] PKG:")
                               (c/color :dim (.getName ^java.io.File (first args))))
-    :license-file      (c/say (c/color :green "✓ license:")
+    :license-file      (c/say (c/color :green "[ok] license:")
                               (c/color :dim (.getName ^java.io.File (first args))))
     :item-error        (c/say (c/color :red "error:") (first args))
     :progress          (let [done (first args) total (second args)]
@@ -187,24 +187,24 @@
                          (flush))
     :progress-done     (println)
     :extract-start     (do (render-rule)
-                           (c/say (c/color :bold "📀")
+                           (c/say (c/color :bold ">")
                                   (or (tsv/display-name (first args))
                                       (tsv/content-id (first args)))))
     :extract-no-pkg    (c/say (c/color :red "no PKG found in") (str (first args)))
-    :extract-ok        (c/say (c/color :green "✓ extracted:")
+    :extract-ok        (c/say (c/color :green "[ok] extracted:")
                               (c/color :dim (.getName ^java.io.File (first args))))
     :extract-fail      (c/say (c/color :red "extract failed"))
     :extract-skip      (c/say (c/color :dim "extract not needed for") (name (first args)))
     :fix-renamed       (c/say (c/color :green "renamed:")
-                              (c/color :dim (.getName ^java.io.File (first args))) "→"
+                              (c/color :dim (.getName ^java.io.File (first args))) "->"
                               (c/color :cyan (.getName ^java.io.File (second args))))
-    :fix-nothing       (c/say (c/color :green "✓") "all files already in expected naming format")
+    :fix-nothing       (c/say (c/color :green "[ok]") "all files already in expected naming format")
     :fix-summary       (c/say "fixed" (c/color :green (str (first args))) "file(s)")
-    :license-created   (c/say (c/color :green "✓")
+    :license-created   (c/say (c/color :green "[ok]")
                               (c/color (c/platform-color (first args))
                                        (name (first args)))
                               (c/color :dim (.getName ^java.io.File (second args))))
-    :license-nothing   (c/say (c/color :green "✓") "all downloads have licenses (or don't need them)")
+    :license-nothing   (c/say (c/color :green "[ok]") "all downloads have licenses (or don't need them)")
     :license-summary   (c/say "created" (c/color :green (str (first args))) "license(s)")
     nil))
 

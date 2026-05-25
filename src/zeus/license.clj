@@ -47,7 +47,7 @@
   (when (and (string? zrif) (not (sentinels zrif)))
     (try
       (inflate (.decode (Base64/getDecoder) zrif))
-      (catch Exception _ nil))))
+      (catch IllegalArgumentException _ nil))))
 
 (defn- write-bytes [^java.io.File f ^bytes data]
   (io/make-parents f)

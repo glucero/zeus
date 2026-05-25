@@ -6,19 +6,21 @@
 (def ^:private valid-types (set p/content-types))
 (def ^:private valid-regions (set p/regions))
 
+(defn- valid-keywords
+  "Lowercase + keywordize each item in xs, keep only those in valid-set."
+  [valid-set xs]
+  (into #{}
+        (comp (map (comp keyword str/lower-case))
+              (filter valid-set))
+        xs))
+
 (defn- restore-types [saved]
-  (->> (or saved [])
-       (map (comp keyword str/lower-case))
-       (filter valid-types)
-       set))
+  (valid-keywords valid-types saved))
 
 (defn- restore-regions [saved]
   (if (nil? saved)
     valid-regions
-    (->> saved
-         (map (comp keyword str/lower-case))
-         (filter valid-regions)
-         set)))
+    (valid-keywords valid-regions saved)))
 
 (defn new-session
   "Build a fresh session map from a loaded config.

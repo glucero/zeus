@@ -1,6 +1,7 @@
 (ns zeus.view
   "Render handler events to stdout. The single public entry is `render!`,
-   which takes an event tuple `[tag & args]` and prints to stdout.
+   which takes an event tuple `[tag & args]` and looks `tag` up in the
+   `renderers` map to find a fn that prints to stdout.
 
    Handlers in zeus.commands stay pure: they compute the next session and
    a vector of events. zeus.core walks the events and pipes each through
@@ -22,9 +23,6 @@
 
 (defn- joined-regions [regions]
   (str/join ", " (sort (map (comp str/upper-case name) regions))))
-
-(defn- render-say [level msg]
-  (c/say (c/color (level->color level :white) msg)))
 
 (defn- render-rule []
   (c/say (c/color :dim (apply str (repeat 28 \-)))))
@@ -69,35 +67,35 @@
   exit, quit                     Exit
 ")
 
-(defn- render-result-row [i row]
+(defn- render-result-row [index row]
   (let [source (:_source row)
         plat (p/platform-from-source source)
-        ct (last (str/split (name source) #"_"))]
+        content-kind (last (str/split (name source) #"_"))]
     (println (format "  %3d. %s | %s | %-40s | %-4s | %9s"
-                     (inc i)
+                     (inc index)
                      (c/color (c/platform-color plat) (name plat))
-                     ct
+                     content-kind
                      (or (tsv/display-name row) "")
                      (or (:region row) "")
                      (or (fmt/format-size (:file-size row)) "")))))
 
 (defn- render-results [results]
   (c/say (c/color :green (str "found " (count results) " result(s):")))
-  (doseq [[i row] (map-indexed vector results)]
-    (render-result-row i row)))
+  (doseq [[index row] (map-indexed vector results)]
+    (render-result-row index row)))
 
 (defn- render-license-status [plat item]
   (case plat
-    :psv (let [z (:zrif item)]
+    :psv (let [zrif (:zrif item)]
            (println "  zRIF:      "
-                    (if (and z (not (#{"" "MISSING"} z)))
+                    (if (and zrif (not (#{"" "MISSING"} zrif)))
                       (c/color :green "[ok] available")
                       (c/color :red "[!] missing"))))
-    (:ps3 :psp) (let [r (:rap item)]
+    (:ps3 :psp) (let [rap (:rap item)]
                   (println "  RAP:       "
                            (cond
-                             (= "NOT REQUIRED" r) (c/color :dim "not required")
-                             (and r (not (#{"" "MISSING"} r))) (c/color :green "[ok] available")
+                             (= "NOT REQUIRED" rap) (c/color :dim "not required")
+                             (and rap (not (#{"" "MISSING"} rap))) (c/color :green "[ok] available")
                              :else (c/color :red "[!] missing"))))
     nil))
 
@@ -123,92 +121,105 @@
     (render-license-status plat item)
     (render-rule)))
 
+(defn- render-banner []
+  (println)
+  (c/say (c/color :bold "zeus") "- Interactive Browser")
+  (c/say (c/color :dim "type 'help' for commands, 'exit' to quit"))
+  (println))
+
+(defn- render-progress [done total]
+  (print (format "\r  progress: %.1f%% (%.1f/%.1f MB)"
+                 (* 100.0 (/ done (double total)))
+                 (/ done (* 1024.0 1024))
+                 (/ total (* 1024.0 1024))))
+  (flush))
+
+(def renderers
+  "Map of event tag -> render fn. Each fn is called with the event's
+   trailing args (after the tag). Adding a new event = adding a map entry."
+  {:blank             (fn [] (println))
+   :rule              render-rule
+   :banner            render-banner
+   :goodbye           (fn [] (c/say (c/color :dim "goodbye")))
+   :say               (fn [level msg]
+                        (c/say (c/color (level->color level :white) msg)))
+   :status            render-status
+   :help              (fn [] (println help-text))
+   :cleared           (fn [] (c/say (c/color :yellow "cleared all selections")))
+   :refresh-on        (fn [] (c/say (c/color :yellow "force refresh enabled")))
+   :refresh-off       (fn [] (c/say (c/color :green "force refresh disabled (using cache)")))
+   :refresh-state     (fn [on?] (println "  force refresh is"
+                                         (if on? (c/color :yellow "on")
+                                             (c/color :green "off"))))
+   :types-added       (fn [types] (c/say (c/color :green "added:") (joined-types types)))
+   :types-removed     (fn [types] (c/say (c/color :yellow "removed:") (joined-types types)))
+   :types-no-change   (fn [] (c/say (c/color :dim "no change")))
+   :regions-set       (fn [regions]
+                        (println "  regions:"
+                                 (c/color :cyan (if (empty? regions) "none"
+                                                    (joined-regions regions)))))
+   :usage             (fn [msg] (c/say (c/color :dim (str "usage: " msg))))
+   :no-types-selected (fn [] (c/say (c/color :yellow "no content types selected")))
+   :no-search-results (fn [] (c/say "no search results - run 'search' first"))
+   :no-results        (fn [] (c/say (c/color :yellow "no results")))
+   :invalid-index     (fn [] (c/say (c/color :red "invalid number")))
+   :unknown-command   (fn [cmd] (c/say (c/color :red "unknown command:") cmd
+                                       (c/color :dim "(try 'help')")))
+   :repl-error        (fn [msg] (c/say (c/color :red "error:") msg))
+   :searching         (fn [term] (c/say "searching for" (c/color :cyan term) "..."))
+   :results           render-results
+   :item-info         render-item-info
+   :tsv-warning       (fn [content-type msg]
+                        (c/say (c/color :yellow "warning:") "could not load"
+                               (color-type content-type) "-" msg))
+   :sync-start        (fn [n] (c/say (c/color :bold "syncing")
+                                     (c/color :cyan (str n)) "database(s)"))
+   :sync-one          (fn [content-type] (c/say (c/color :dim ">") (color-type content-type)))
+   :sync-skip         (fn [content-type] (c/say (c/color :yellow "skipping")
+                                                (color-type content-type)
+                                                (c/color :dim "(no URL configured)")))
+   :sync-error        (fn [content-type msg] (c/say (c/color :red "error syncing")
+                                                    (name content-type) "-" msg))
+   :download-start    (fn [item] (render-rule)
+                        (c/say (c/color :bold ">") (tsv/display-name item)))
+   :download-pkg      (fn [^java.io.File pkg-file]
+                        (c/say (c/color :green "[ok] PKG:") (c/color :dim (.getName pkg-file))))
+   :license-file      (fn [^java.io.File lic-file]
+                        (c/say (c/color :green "[ok] license:") (c/color :dim (.getName lic-file))))
+   :item-error        (fn [msg] (c/say (c/color :red "error:") msg))
+   :progress          render-progress
+   :progress-done     (fn [] (println))
+   :extract-start     (fn [item] (render-rule)
+                        (c/say (c/color :bold ">")
+                               (or (tsv/display-name item) (tsv/content-id item))))
+   :extract-no-pkg    (fn [dir] (c/say (c/color :red "no PKG found in") (str dir)))
+   :extract-ok        (fn [^java.io.File out]
+                        (c/say (c/color :green "[ok] extracted:")
+                               (c/color :dim (.getName out))))
+   :extract-fail      (fn [] (c/say (c/color :red "extract failed")))
+   :extract-skip      (fn [plat] (c/say (c/color :dim "extract not needed for") (name plat)))
+   :fix-renamed       (fn [^java.io.File old-file ^java.io.File target]
+                        (c/say (c/color :green "renamed:")
+                               (c/color :dim (.getName old-file)) "->"
+                               (c/color :cyan (.getName target))))
+   :fix-nothing       (fn [] (c/say (c/color :green "[ok]")
+                                    "all files already in expected naming format"))
+   :fix-summary       (fn [n] (c/say "fixed" (c/color :green (str n)) "file(s)"))
+   :license-created   (fn [plat ^java.io.File dir]
+                        (c/say (c/color :green "[ok]")
+                               (c/color (c/platform-color plat) (name plat))
+                               (c/color :dim (.getName dir))))
+   :license-nothing   (fn [] (c/say (c/color :green "[ok]")
+                                    "all downloads have licenses (or don't need them)"))
+   :license-summary   (fn [n] (c/say "created" (c/color :green (str n)) "license(s)"))})
+
 (defn render!
-  "Render one event tuple to stdout."
+  "Render one event tuple to stdout. Unknown tags are silently ignored."
   [[tag & args]]
-  (case tag
-    :blank             (println)
-    :rule              (render-rule)
-    :banner            (do (println)
-                           (c/say (c/color :bold "zeus")
-                                  "- Interactive Browser")
-                           (c/say (c/color :dim "type 'help' for commands, 'exit' to quit"))
-                           (println))
-    :goodbye           (c/say (c/color :dim "goodbye"))
-    :say               (apply render-say args)
-    :status            (render-status (first args))
-    :help              (println help-text)
-    :cleared           (c/say (c/color :yellow "cleared all selections"))
-    :refresh-on        (c/say (c/color :yellow "force refresh enabled"))
-    :refresh-off       (c/say (c/color :green "force refresh disabled (using cache)"))
-    :refresh-state     (println "  force refresh is"
-                                (if (first args)
-                                  (c/color :yellow "on")
-                                  (c/color :green "off")))
-    :types-added       (c/say (c/color :green "added:") (joined-types (first args)))
-    :types-removed     (c/say (c/color :yellow "removed:") (joined-types (first args)))
-    :types-no-change   (c/say (c/color :dim "no change"))
-    :regions-set       (let [regs (first args)]
-                         (println "  regions:"
-                                  (c/color :cyan (if (empty? regs) "none"
-                                                     (joined-regions regs)))))
-    :usage             (c/say (c/color :dim (str "usage: " (first args))))
-    :no-types-selected (c/say (c/color :yellow "no content types selected"))
-    :no-search-results (c/say "no search results - run 'search' first")
-    :no-results        (c/say (c/color :yellow "no results"))
-    :invalid-index     (c/say (c/color :red "invalid number"))
-    :unknown-command   (c/say (c/color :red "unknown command:") (first args)
-                              (c/color :dim "(try 'help')"))
-    :repl-error        (c/say (c/color :red "error:") (first args))
-    :searching         (c/say "searching for" (c/color :cyan (first args)) "...")
-    :results           (render-results (first args))
-    :item-info         (render-item-info (first args))
-    :tsv-warning       (c/say (c/color :yellow "warning:") "could not load"
-                              (color-type (first args)) "-" (second args))
-    :sync-start        (c/say (c/color :bold "syncing")
-                              (c/color :cyan (str (first args))) "database(s)")
-    :sync-one          (c/say (c/color :dim ">") (color-type (first args)))
-    :sync-skip         (c/say (c/color :yellow "skipping") (color-type (first args))
-                              (c/color :dim "(no URL configured)"))
-    :sync-error        (c/say (c/color :red "error syncing")
-                              (name (first args)) "-" (second args))
-    :download-start    (do (render-rule)
-                           (c/say (c/color :bold ">") (tsv/display-name (first args))))
-    :download-pkg      (c/say (c/color :green "[ok] PKG:")
-                              (c/color :dim (.getName ^java.io.File (first args))))
-    :license-file      (c/say (c/color :green "[ok] license:")
-                              (c/color :dim (.getName ^java.io.File (first args))))
-    :item-error        (c/say (c/color :red "error:") (first args))
-    :progress          (let [done (first args) total (second args)]
-                         (print (format "\r  progress: %.1f%% (%.1f/%.1f MB)"
-                                        (* 100.0 (/ done (double total)))
-                                        (/ done (* 1024.0 1024))
-                                        (/ total (* 1024.0 1024))))
-                         (flush))
-    :progress-done     (println)
-    :extract-start     (do (render-rule)
-                           (c/say (c/color :bold ">")
-                                  (or (tsv/display-name (first args))
-                                      (tsv/content-id (first args)))))
-    :extract-no-pkg    (c/say (c/color :red "no PKG found in") (str (first args)))
-    :extract-ok        (c/say (c/color :green "[ok] extracted:")
-                              (c/color :dim (.getName ^java.io.File (first args))))
-    :extract-fail      (c/say (c/color :red "extract failed"))
-    :extract-skip      (c/say (c/color :dim "extract not needed for") (name (first args)))
-    :fix-renamed       (c/say (c/color :green "renamed:")
-                              (c/color :dim (.getName ^java.io.File (first args))) "->"
-                              (c/color :cyan (.getName ^java.io.File (second args))))
-    :fix-nothing       (c/say (c/color :green "[ok]") "all files already in expected naming format")
-    :fix-summary       (c/say "fixed" (c/color :green (str (first args))) "file(s)")
-    :license-created   (c/say (c/color :green "[ok]")
-                              (c/color (c/platform-color (first args))
-                                       (name (first args)))
-                              (c/color :dim (.getName ^java.io.File (second args))))
-    :license-nothing   (c/say (c/color :green "[ok]") "all downloads have licenses (or don't need them)")
-    :license-summary   (c/say "created" (c/color :green (str (first args))) "license(s)")
-    nil))
+  (when-let [renderer (renderers tag)]
+    (apply renderer args)))
 
 (defn render-all!
   "Render every event in `events` in order."
   [events]
-  (doseq [e events] (render! e)))
+  (doseq [event events] (render! event)))

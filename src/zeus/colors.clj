@@ -1,4 +1,5 @@
-(ns zeus.colors)
+(ns zeus.colors
+  (:require [clojure.string :as str]))
 
 (def ^:private esc "[")
 (def reset (str esc "0m"))
@@ -32,3 +33,8 @@
 
 (defn platform-color [plat]
   (get platform->color plat :white))
+
+(defn say
+  "Print `args` (space-joined) with a two-space indent and a trailing newline."
+  [& args]
+  (println (str "  " (str/join " " args))))

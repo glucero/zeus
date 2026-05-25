@@ -38,8 +38,8 @@
   "Print the session's current selections and refresh mode."
   [{:keys [selected-types selected-regions force-refresh?] :as session}]
   (println)
-  (println " " (c/color :bold "Current Settings"))
-  (println " " (c/color :dim "─────────────────"))
+  (c/say (c/color :bold "Current Settings"))
+  (c/say (c/color :dim "─────────────────"))
   (print-types selected-types)
   (print-regions selected-regions)
   (println "  Refresh:"
@@ -81,9 +81,9 @@
    args: [] = show, [\"on\"] = enable, [\"off\"] = disable."
   [session args]
   (case (some-> args first str/lower-case)
-    "on"  (do (println " " (c/color :yellow "force refresh enabled"))
+    "on"  (do (c/say (c/color :yellow "force refresh enabled"))
               (sess/set-refresh session true))
-    "off" (do (println " " (c/color :green "force refresh disabled (using cache)"))
+    "off" (do (c/say (c/color :green "force refresh disabled (using cache)"))
               (sess/set-refresh session false))
     (do (println "  force refresh is"
                  (if (:force-refresh? session)
@@ -94,7 +94,7 @@
 (defn handle-clear
   "Drop all selected types and restore all regions."
   [session]
-  (println " " (c/color :yellow "cleared all selections"))
+  (c/say (c/color :yellow "cleared all selections"))
   (sess/clear-selections session))
 
 (defn handle-select
@@ -104,8 +104,8 @@
         added (sort (clojure.set/difference (:selected-types updated)
                                             (:selected-types session)))]
     (if (seq added)
-      (println " " (c/color :green "added:") (str/join ", " (map color-type added)))
-      (println " " (c/color :dim "no change")))
+      (c/say (c/color :green "added:") (str/join ", " (map color-type added)))
+      (c/say (c/color :dim "no change")))
     updated))
 
 (defn handle-unselect
@@ -115,8 +115,8 @@
         removed (sort (clojure.set/difference (:selected-types session)
                                               (:selected-types updated)))]
     (if (seq removed)
-      (println " " (c/color :yellow "removed:") (str/join ", " (map color-type removed)))
-      (println " " (c/color :dim "no change")))
+      (c/say (c/color :yellow "removed:") (str/join ", " (map color-type removed)))
+      (c/say (c/color :dim "no change")))
     updated))
 
 (defn handle-region
@@ -136,26 +136,26 @@
 
 (defn- sync-one [{:keys [config force-refresh?]} content-type]
   (if-let [url (get-in config [:catalog_urls content-type])]
-    (do (println " " (c/color :dim "⬇") (color-type content-type))
+    (do (c/say (c/color :dim "⬇") (color-type content-type))
         (tsv/download-tsv {:url url
                            :cache-file (cache-file-for config content-type)
                            :expiration-days (:cache_expiration_days config)
                            :force? force-refresh?}))
-    (println " " (c/color :yellow "skipping") (color-type content-type)
+    (c/say (c/color :yellow "skipping") (color-type content-type)
              (c/color :dim "(no URL configured)"))))
 
 (defn handle-sync
   "Download/refresh the TSVs for every selected content type."
   [{:keys [selected-types] :as session}]
   (if (empty? selected-types)
-    (println " " (c/color :yellow "no content types selected"))
-    (do (println " " (c/color :bold "syncing")
+    (c/say (c/color :yellow "no content types selected"))
+    (do (c/say (c/color :bold "syncing")
                  (c/color :cyan (str (count selected-types)))
                  "database(s)")
         (doseq [ct (sort selected-types)]
           (try (sync-one session ct)
                (catch Exception e
-                 (println " " (c/color :red "error syncing")
+                 (c/say (c/color :red "error syncing")
                           (name ct) "—" (.getMessage e)))))))
   session)
 
@@ -193,12 +193,12 @@
         dir (naming/content-dir (:output_dir config) (:_source item) cid)]
     (.mkdirs ^java.io.File dir)
     (println (c/color :dim "  ────────────────────────────"))
-    (println " " (c/color :bold "⬇") (tsv/display-name item))
+    (c/say (c/color :bold "⬇") (tsv/display-name item))
     (when-let [pkg-file (pkg/download-pkg item dir {:progress-fn (progress-printer)})]
       (println)
-      (println " " (c/color :green "✓ PKG:") (c/color :dim (.getName pkg-file))))
+      (c/say (c/color :green "✓ PKG:") (c/color :dim (.getName pkg-file))))
     (when-let [lic (license/write-license-file item dir)]
-      (println " " (c/color :green "✓ license:") (c/color :dim (.getName lic))))))
+      (c/say (c/color :green "✓ license:") (c/color :dim (.getName lic))))))
 
 (defn- platform-dirs [output-dir]
   (keep (fn [[plat folder]]
@@ -225,20 +225,20 @@
                                 (.listFiles ^java.io.File content-dir)))]
     (cond
       (nil? pkg-file)
-      (println " " (c/color :red "no PKG found in") (str content-dir))
+      (c/say (c/color :red "no PKG found in") (str content-dir))
 
       (= :psp plat)
       (if-let [out (extract/extract-psp pkg-file content-dir)]
-        (println " " (c/color :green "✓ extracted:") (c/color :dim (.getName out)))
-        (println " " (c/color :red "extract failed")))
+        (c/say (c/color :green "✓ extracted:") (c/color :dim (.getName out)))
+        (c/say (c/color :red "extract failed")))
 
       (= :psx plat)
       (if-let [out (extract/extract-psx pkg-file content-dir)]
-        (println " " (c/color :green "✓ extracted:") (c/color :dim (.getName out)))
-        (println " " (c/color :red "extract failed")))
+        (c/say (c/color :green "✓ extracted:") (c/color :dim (.getName out)))
+        (c/say (c/color :red "extract failed")))
 
       :else
-      (println " " (c/color :dim "extract not needed for") (name plat)))))
+      (c/say (c/color :dim "extract not needed for") (name plat)))))
 
 (defn handle-extract
   "Extract PSP/PSX ISO from PKG for last-results items indexed by `args`."
@@ -259,7 +259,7 @@
                   dir (naming/content-dir (:output_dir config)
                                           (:_source item) cid)]]
       (println (c/color :dim "  ────────────────────────────"))
-      (println " " (c/color :bold "📀") (or (tsv/display-name item) cid))
+      (c/say (c/color :bold "📀") (or (tsv/display-name item) cid))
       (extract-item item dir)))
   session)
 
@@ -284,11 +284,11 @@
               :when (and item (not (has-license? dir)))]
         (when (license/write-license-file (assoc item :_source (:_source item)) dir)
           (swap! made inc)
-          (println " " (c/color :green "✓")
+          (c/say (c/color :green "✓")
                    (c/color (c/platform-color plat) (name plat))
                    (c/color :dim (.getName dir)))))
       (if (zero? @made)
-        (println " " (c/color :green "✓") "all downloads have licenses (or don't need them)")
+        (c/say (c/color :green "✓") "all downloads have licenses (or don't need them)")
         (println "  created" (c/color :green (str @made)) "license(s)"))))
   session)
 
@@ -313,11 +313,11 @@
               :when (.exists old)]
         (when (rename-with-base old base)
           (swap! fixed inc)
-          (println " " (c/color :green "renamed:")
+          (c/say (c/color :green "renamed:")
                    (c/color :dim (.getName old)) "→"
                    (c/color :cyan (str base "." ext)))))
       (if (zero? @fixed)
-        (println " " (c/color :green "✓") "all files already in expected naming format")
+        (c/say (c/color :green "✓") "all files already in expected naming format")
         (println "  fixed" (c/color :green (str @fixed)) "file(s)"))))
   session)
 
@@ -332,7 +332,7 @@
       (doseq [i indices]
         (try (download-one session (nth last-results i))
              (catch Exception e
-               (println " " (c/color :red "error:") (.getMessage e)))))))
+               (c/say (c/color :red "error:") (.getMessage e)))))))
   session)
 
 (defn handle-info
@@ -348,9 +348,9 @@
             plat (p/platform-from-source source)
             size-bytes (:file-size item)
             pkg-url (:pkg-direct-link item)]
-        (println " " (c/color :dim "────────────────────────────"))
-        (println " " (c/color :bold (or (tsv/display-name item) "")))
-        (println " " (c/color :dim "────────────────────────────"))
+        (c/say (c/color :dim "────────────────────────────"))
+        (c/say (c/color :bold (or (tsv/display-name item) "")))
+        (c/say (c/color :dim "────────────────────────────"))
         (println "  Title ID:  " (c/color :cyan (or (:title-id item) "—")))
         (println "  Content ID:" (c/color :dim (or (:content-id item) "—")))
         (println "  Region:    " (or (:region item) "—"))
@@ -363,8 +363,8 @@
                    (c/color :green "✓ available")
                    (c/color :red "✗ missing")))
         (print-license-status plat item)
-        (println " " (c/color :dim "────────────────────────────")))
-      (println " " (c/color :red "invalid number"))))
+        (c/say (c/color :dim "────────────────────────────")))
+      (c/say (c/color :red "invalid number"))))
   session)
 
 (defn- ensure-tsv
@@ -400,7 +400,7 @@
     (do (println "  usage: search <term>") session)
 
     (empty? selected-types)
-    (do (println " " (c/color :yellow "no content types selected — use 'select' first"))
+    (do (c/say (c/color :yellow "no content types selected — use 'select' first"))
         session)
 
     :else
@@ -410,8 +410,8 @@
                      (sort selected-types))
           results (search/search-content tsvs term selected-regions)]
       (if (empty? results)
-        (do (println " " (c/color :yellow "no results")) (sess/set-results session []))
-        (do (println " " (c/color :green (str "found " (count results) " result(s):")))
+        (do (c/say (c/color :yellow "no results")) (sess/set-results session []))
+        (do (c/say (c/color :green (str "found " (count results) " result(s):")))
             (doseq [[i row] (map-indexed vector results)]
               (print-result-row i row))
             (sess/set-results session results))))))

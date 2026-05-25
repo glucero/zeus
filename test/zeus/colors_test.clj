@@ -27,3 +27,9 @@
   (testing "unknown platform falls back to :white"
     (is (= :white (c/platform-color :unknown)))
     (is (= :white (c/platform-color nil)))))
+
+(deftest say
+  (testing "two-space indent with newline"
+    (is (= "  hello\n" (with-out-str (c/say "hello")))))
+  (testing "joins multiple args with single spaces"
+    (is (= "  a b c\n" (with-out-str (c/say "a" "b" "c"))))))

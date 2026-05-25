@@ -43,7 +43,7 @@
     "sync"     (cmd/handle-sync session)
     "refresh"  (cmd/handle-refresh session args)
     "clear"    (cmd/handle-clear session)
-    (do (println " " (c/color :red "unknown command:") cmd
+    (do (c/say (c/color :red "unknown command:") cmd
                  (c/color :dim "(try 'help')"))
         session)))
 
@@ -67,16 +67,16 @@
   [config-path]
   (let [config (cfg/load-config config-path)]
     (println)
-    (println " " (c/color :bold "zeus") "— NoPayStation Interactive Browser")
-    (println " " (c/color :dim "type 'help' for commands, 'exit' to quit"))
+    (c/say (c/color :bold "zeus") "— NoPayStation Interactive Browser")
+    (c/say (c/color :dim "type 'help' for commands, 'exit' to quit"))
     (println)
     (loop [session (sess/new-session config)]
       (let [next (try (read-and-dispatch session config-path)
                       (catch Exception e
-                        (println " " (c/color :red "error:") (.getMessage e))
+                        (c/say (c/color :red "error:") (.getMessage e))
                         session))]
         (cond
-          (= ::exit next) (println " " (c/color :dim "👋 goodbye"))
+          (= ::exit next) (c/say (c/color :dim "👋 goodbye"))
           :else (recur next))))))
 
 (defn -main

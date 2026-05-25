@@ -1,9 +1,10 @@
 (ns zeus.commands
+  "Command handlers. Each handler is pure-ish: takes [session args],
+   returns {:session updated-session, :events [event-tuple ...]}.
+   The events vector is rendered by zeus.view; the session is the new state."
   (:require [clojure.java.io :as io]
+            [clojure.set :as set]
             [clojure.string :as str]
-            [zeus.colors :as c]
-            [zeus.extract :as extract]
-            [zeus.format :as fmt]
             [zeus.license :as license]
             [zeus.naming :as naming]
             [zeus.pkg :as pkg]
@@ -12,152 +13,63 @@
             [zeus.session :as sess]
             [zeus.tsv :as tsv]))
 
-(defn- color-type [t]
-  (c/color (c/platform-color (p/platform-from-source t)) (name t)))
+(defn- result [session events]
+  {:session session :events (vec events)})
 
-(defn- print-types [selected]
-  (if (empty? selected)
-    (println "  Content:" (c/color :dim "none (use 'select' to add)"))
-    (println "  Content:" (str/join ", " (map color-type (sort selected))))))
+(defn handle-status [session]
+  (result session [[:status session]]))
 
-(defn- print-regions [selected]
-  (cond
-    (= (set p/regions) selected)
-    (println "  Regions:" (c/color :green "all"))
+(defn handle-help [session]
+  (result session [[:help]]))
 
-    (empty? selected)
-    (println "  Regions:" (c/color :red "none"))
-
-    :else
-    (println "  Regions:"
-             (c/color :cyan
-                      (str/join ", " (sort (map (comp str/upper-case name)
-                                                selected)))))))
-
-(defn handle-status
-  "Print the session's current selections and refresh mode."
-  [{:keys [selected-types selected-regions force-refresh?] :as session}]
-  (println)
-  (c/say (c/color :bold "Current Settings"))
-  (c/say (c/color :dim "─────────────────"))
-  (print-types selected-types)
-  (print-regions selected-regions)
-  (println "  Refresh:"
-           (if force-refresh?
-             (c/color :yellow "forced")
-             (c/color :green "cached")))
-  (println)
-  session)
-
-(def ^:private help-text
-  "
-  Commands
-  ───────────
-  select   <type|platform|all>   Add content type(s) to search
-  unselect <type|platform|all>   Remove content type(s) from search
-  region   <region|all|clear>    Toggle region filter (US, EU, JP, ASIA)
-  search   <term>                Search selected content types
-  info     <number>              Show detailed info for a result
-  download <numbers>             Download PKG + license
-  extract  <numbers|all|missing> Extract ISO from PKG (PSP/PSX only)
-  fix      all                   Rename PKG/RAP files to new format
-  license  all                   Create missing license files
-  sync                           Download/update selected databases
-  refresh  on|off                Toggle force-refresh mode
-  status                         Show current settings
-  clear                          Clear all selections
-  help                           Show this help
-  exit, quit                     Exit
-")
-
-(defn handle-help
-  "Print the help text. Returns the session unchanged."
-  [session]
-  (println help-text)
-  session)
-
-(defn handle-refresh
-  "Set or display the force-refresh flag.
-   args: [] = show, [\"on\"] = enable, [\"off\"] = disable."
-  [session args]
+(defn handle-refresh [session args]
   (case (some-> args first str/lower-case)
-    "on"  (do (c/say (c/color :yellow "force refresh enabled"))
-              (sess/set-refresh session true))
-    "off" (do (c/say (c/color :green "force refresh disabled (using cache)"))
-              (sess/set-refresh session false))
-    (do (println "  force refresh is"
-                 (if (:force-refresh? session)
-                   (c/color :yellow "on")
-                   (c/color :green "off")))
-        session)))
+    "on"  (result (sess/set-refresh session true)  [[:refresh-on]])
+    "off" (result (sess/set-refresh session false) [[:refresh-off]])
+    (result session [[:refresh-state (:force-refresh? session)]])))
 
-(defn handle-clear
-  "Drop all selected types and restore all regions."
-  [session]
-  (c/say (c/color :yellow "cleared all selections"))
-  (sess/clear-selections session))
+(defn handle-clear [session]
+  (result (sess/clear-selections session) [[:cleared]]))
 
-(defn handle-select
-  "Add content types named by args to the session selection."
-  [session args]
+(defn handle-select [session args]
   (let [updated (sess/select-types session args)
-        added (sort (clojure.set/difference (:selected-types updated)
-                                            (:selected-types session)))]
-    (if (seq added)
-      (c/say (c/color :green "added:") (str/join ", " (map color-type added)))
-      (c/say (c/color :dim "no change")))
-    updated))
+        added (set/difference (:selected-types updated) (:selected-types session))]
+    (result updated
+            (if (seq added) [[:types-added added]] [[:types-no-change]]))))
 
-(defn handle-unselect
-  "Remove content types named by args from the session selection."
-  [session args]
+(defn handle-unselect [session args]
   (let [updated (sess/unselect-types session args)
-        removed (sort (clojure.set/difference (:selected-types session)
-                                              (:selected-types updated)))]
-    (if (seq removed)
-      (c/say (c/color :yellow "removed:") (str/join ", " (map color-type removed)))
-      (c/say (c/color :dim "no change")))
-    updated))
+        removed (set/difference (:selected-types session) (:selected-types updated))]
+    (result updated
+            (if (seq removed) [[:types-removed removed]] [[:types-no-change]]))))
 
-(defn handle-region
-  "Apply region args (toggle / all / clear)."
-  [session args]
+(defn handle-region [session args]
   (let [updated (sess/set-regions session args)]
-    (println "  regions:"
-             (c/color :cyan
-                      (if (empty? (:selected-regions updated))
-                        "none"
-                        (str/join ", " (sort (map (comp str/upper-case name)
-                                                  (:selected-regions updated)))))))
-    updated))
+    (result updated [[:regions-set (:selected-regions updated)]])))
 
 (defn- cache-file-for [config content-type]
   (io/file (:cache_dir config) (str (name content-type) ".tsv")))
 
-(defn- sync-one [{:keys [config force-refresh?]} content-type]
+(defn- sync-one!
+  "Download a single TSV. Returns an event describing the outcome."
+  [{:keys [config force-refresh?]} content-type]
   (if-let [url (get-in config [:catalog_urls content-type])]
-    (do (c/say (c/color :dim "⬇") (color-type content-type))
-        (tsv/download-tsv {:url url
-                           :cache-file (cache-file-for config content-type)
-                           :expiration-days (:cache_expiration_days config)
-                           :force? force-refresh?}))
-    (c/say (c/color :yellow "skipping") (color-type content-type)
-             (c/color :dim "(no URL configured)"))))
+    (try
+      (tsv/download-tsv {:url url
+                         :cache-file (cache-file-for config content-type)
+                         :expiration-days (:cache_expiration_days config)
+                         :force? force-refresh?})
+      [:sync-one content-type]
+      (catch Exception e
+        [:sync-error content-type (.getMessage e)]))
+    [:sync-skip content-type]))
 
-(defn handle-sync
-  "Download/refresh the TSVs for every selected content type."
-  [{:keys [selected-types] :as session}]
+(defn handle-sync [{:keys [selected-types] :as session}]
   (if (empty? selected-types)
-    (c/say (c/color :yellow "no content types selected"))
-    (do (c/say (c/color :bold "syncing")
-                 (c/color :cyan (str (count selected-types)))
-                 "database(s)")
-        (doseq [ct (sort selected-types)]
-          (try (sync-one session ct)
-               (catch Exception e
-                 (c/say (c/color :red "error syncing")
-                          (name ct) "—" (.getMessage e)))))))
-  session)
+    (result session [[:no-types-selected]])
+    (result session
+            (into [[:sync-start (count selected-types)]]
+                  (map (partial sync-one! session) (sort selected-types))))))
 
 (defn- parse-index [arg max-n]
   (try
@@ -165,20 +77,14 @@
       (when (and (>= i 0) (< i max-n)) i))
     (catch NumberFormatException _ nil)))
 
-(defn- print-license-status [plat item]
-  (case plat
-    :psv (let [z (:zrif item)]
-           (println "  zRIF:      "
-                    (if (and z (not (#{"" "MISSING"} z)))
-                      (c/color :green "✓ available")
-                      (c/color :red "✗ missing"))))
-    (:ps3 :psp) (let [r (:rap item)]
-                  (println "  RAP:       "
-                           (cond
-                             (= "NOT REQUIRED" r) (c/color :dim "not required")
-                             (and r (not (#{"" "MISSING"} r))) (c/color :green "✓ available")
-                             :else (c/color :red "✗ missing"))))
-    nil))
+(defn handle-info [{:keys [last-results] :as session} args]
+  (cond
+    (empty? args)         (result session [[:usage "info <number>"]])
+    (empty? last-results) (result session [[:no-search-results]])
+    :else
+    (if-let [idx (parse-index (first args) (count last-results))]
+      (result session [[:item-info (nth last-results idx)]])
+      (result session [[:invalid-index]]))))
 
 (defn- progress-printer []
   (fn [done total]
@@ -188,17 +94,67 @@
                    (/ total (* 1024.0 1024))))
     (flush)))
 
-(defn- download-one [{:keys [config]} item]
+(defn- download-one!
+  "Download PKG + license for one item. Returns a seq of events."
+  [{:keys [config]} item]
   (let [cid (or (tsv/content-id item) "unknown")
-        dir (naming/content-dir (:output_dir config) (:_source item) cid)]
-    (.mkdirs ^java.io.File dir)
-    (println (c/color :dim "  ────────────────────────────"))
-    (c/say (c/color :bold "⬇") (tsv/display-name item))
-    (when-let [pkg-file (pkg/download-pkg item dir {:progress-fn (progress-printer)})]
-      (println)
-      (c/say (c/color :green "✓ PKG:") (c/color :dim (.getName pkg-file))))
-    (when-let [lic (license/write-license-file item dir)]
-      (c/say (c/color :green "✓ license:") (c/color :dim (.getName lic))))))
+        dir (naming/content-dir (:output_dir config) (:_source item) cid)
+        _ (.mkdirs ^java.io.File dir)
+        pkg-file (pkg/download-pkg item dir {:progress-fn (progress-printer)})
+        lic (when pkg-file (license/write-license-file item dir))]
+    (cond-> [[:download-start item]]
+      pkg-file (conj [:download-pkg pkg-file])
+      lic      (conj [:license-file lic]))))
+
+(defn handle-download [{:keys [last-results] :as session} args]
+  (cond
+    (empty? args)         (result session [[:usage "download <number> [...]"]])
+    (empty? last-results) (result session [[:no-search-results]])
+    :else
+    (result session
+            (mapcat (fn [a]
+                      (if-let [i (parse-index a (count last-results))]
+                        (try (download-one! session (nth last-results i))
+                             (catch Exception e [[:item-error (.getMessage e)]]))
+                        [[:invalid-index]]))
+                    args))))
+
+(defn- extract-events
+  "Compute events for extracting one indexed item."
+  [{:keys [config]} item]
+  (let [plat (p/platform-from-source (:_source item))
+        cid (tsv/content-id item)
+        dir (naming/content-dir (:output_dir config) (:_source item) cid)
+        pkg-file (first (filter #(str/ends-with? (.getName %) ".pkg")
+                                (.listFiles ^java.io.File dir)))]
+    (cond
+      (nil? pkg-file)
+      [[:extract-start item] [:extract-no-pkg dir]]
+
+      (= :psp plat)
+      (let [out ((requiring-resolve 'zeus.extract/extract-psp) pkg-file dir)]
+        [[:extract-start item]
+         (if out [:extract-ok out] [:extract-fail])])
+
+      (= :psx plat)
+      (let [out ((requiring-resolve 'zeus.extract/extract-psx) pkg-file dir)]
+        [[:extract-start item]
+         (if out [:extract-ok out] [:extract-fail])])
+
+      :else
+      [[:extract-start item] [:extract-skip plat]])))
+
+(defn handle-extract [{:keys [last-results] :as session} args]
+  (cond
+    (empty? args)         (result session [[:usage "extract <number> [...]"]])
+    (empty? last-results) (result session [[:no-search-results]])
+    :else
+    (result session
+            (mapcat (fn [a]
+                      (if-let [i (parse-index a (count last-results))]
+                        (extract-events session (nth last-results i))
+                        [[:invalid-index]]))
+                    args))))
 
 (defn- platform-dirs [output-dir]
   (keep (fn [[plat folder]]
@@ -215,97 +171,16 @@
 (defn- rename-with-base [^java.io.File f new-base]
   (let [ext (subs (.getName f) (.lastIndexOf (.getName f) "."))
         target (io/file (.getParentFile f) (str new-base ext))]
-    (when-not (= f target)
-      (.renameTo f target)
+    (when (and (not= f target) (.renameTo f target))
       target)))
 
-(defn- extract-item [item content-dir]
-  (let [plat (p/platform-from-source (:_source item))
-        pkg-file (first (filter #(str/ends-with? (.getName %) ".pkg")
-                                (.listFiles ^java.io.File content-dir)))]
-    (cond
-      (nil? pkg-file)
-      (c/say (c/color :red "no PKG found in") (str content-dir))
-
-      (= :psp plat)
-      (if-let [out (extract/extract-psp pkg-file content-dir)]
-        (c/say (c/color :green "✓ extracted:") (c/color :dim (.getName out)))
-        (c/say (c/color :red "extract failed")))
-
-      (= :psx plat)
-      (if-let [out (extract/extract-psx pkg-file content-dir)]
-        (c/say (c/color :green "✓ extracted:") (c/color :dim (.getName out)))
-        (c/say (c/color :red "extract failed")))
-
-      :else
-      (c/say (c/color :dim "extract not needed for") (name plat)))))
-
-(defn handle-extract
-  "Extract PSP/PSX ISO from PKG for last-results items indexed by `args`."
-  [{:keys [last-results config] :as session} args]
-  (cond
-    (empty? args)
-    (println "  usage: extract <number> [number2 ...]")
-
-    (empty? last-results)
-    (println "  no search results — run 'search' first")
-
-    :else
-    (doseq [a args
-            :let [i (parse-index a (count last-results))]
-            :when i
-            :let [item (nth last-results i)
-                  cid (tsv/content-id item)
-                  dir (naming/content-dir (:output_dir config)
-                                          (:_source item) cid)]]
-      (println (c/color :dim "  ────────────────────────────"))
-      (c/say (c/color :bold "📀") (or (tsv/display-name item) cid))
-      (extract-item item dir)))
-  session)
-
-(defn- has-license? [^java.io.File dir]
-  (boolean
-   (or (.exists (io/file dir "work.bin"))
-       (some #(str/ends-with? (.getName %) ".rap")
-             (.listFiles dir)))))
-
-(defn handle-license-all
-  "Walk download dirs and write missing license files using build-lookup."
-  [{:keys [config] :as session} args]
-  (cond
-    (not= ["all"] (mapv str/lower-case args))
-    (println "  usage: license all")
-
-    :else
+(defn handle-fix [{:keys [config] :as session} args]
+  (if (not= ["all"] (mapv str/lower-case args))
+    (result session [[:usage "fix all"]])
     (let [lookup (tsv/build-lookup (:cache_dir config))
-          created (doall
-                   (for [[plat dir] (content-dirs (:output_dir config))
-                         :let [item (get lookup (.getName dir))]
-                         :when (and item (not (has-license? dir)))
-                         :let [out (license/write-license-file item dir)]
-                         :when out]
-                     (do (c/say (c/color :green "✓")
-                                (c/color (c/platform-color plat) (name plat))
-                                (c/color :dim (.getName dir)))
-                         out)))]
-      (if (empty? created)
-        (c/say (c/color :green "✓") "all downloads have licenses (or don't need them)")
-        (c/say "created" (c/color :green (str (count created))) "license(s)"))))
-  session)
-
-(defn handle-fix
-  "Rename CONTENT_ID.pkg / CONTENT_ID.rap to '<Name> [CONTENT_ID].xxx'."
-  [{:keys [config] :as session} args]
-  (cond
-    (not= ["all"] (mapv str/lower-case args))
-    (println "  usage: fix all")
-
-    :else
-    (let [lookup (tsv/build-lookup (:cache_dir config))
-          renamed (doall
+          renames (doall
                    (for [[_ dir] (content-dirs (:output_dir config))
-                         :let [cid (.getName dir)
-                               item (get lookup cid)]
+                         :let [cid (.getName dir) item (get lookup cid)]
                          :when item
                          :let [base (naming/content-base-name
                                      (tsv/display-name item) cid)]
@@ -314,109 +189,69 @@
                          :when (.exists old)
                          :let [target (rename-with-base old base)]
                          :when target]
-                     (do (c/say (c/color :green "renamed:")
-                                (c/color :dim (.getName old)) "→"
-                                (c/color :cyan (.getName target)))
-                         target)))]
-      (if (empty? renamed)
-        (c/say (c/color :green "✓") "all files already in expected naming format")
-        (c/say "fixed" (c/color :green (str (count renamed))) "file(s)"))))
-  session)
+                     [old target]))]
+      (result session
+              (if (empty? renames)
+                [[:fix-nothing]]
+                (conj (mapv (fn [[o t]] [:fix-renamed o t]) renames)
+                      [:fix-summary (count renames)]))))))
 
-(defn handle-download
-  "Download PKG + license for each indexed item in last-results."
-  [{:keys [last-results] :as session} args]
-  (cond
-    (empty? args)         (println "  usage: download <number> [number2 ...]")
-    (empty? last-results) (println "  no search results — run 'search' first")
-    :else
-    (let [indices (keep (fn [a] (parse-index a (count last-results))) args)]
-      (doseq [i indices]
-        (try (download-one session (nth last-results i))
-             (catch Exception e
-               (c/say (c/color :red "error:") (.getMessage e)))))))
-  session)
+(defn- has-license? [^java.io.File dir]
+  (boolean (or (.exists (io/file dir "work.bin"))
+               (some #(str/ends-with? (.getName %) ".rap")
+                     (.listFiles dir)))))
 
-(defn handle-info
-  "Print full details for last-results[n-1]."
-  [{:keys [last-results] :as session} args]
-  (cond
-    (empty? args)        (println "  usage: info <number>")
-    (empty? last-results) (println "  no search results — run 'search' first")
-    :else
-    (if-let [idx (parse-index (first args) (count last-results))]
-      (let [item (nth last-results idx)
-            source (:_source item)
-            plat (p/platform-from-source source)
-            size-bytes (:file-size item)
-            pkg-url (:pkg-direct-link item)]
-        (c/say (c/color :dim "────────────────────────────"))
-        (c/say (c/color :bold (or (tsv/display-name item) "")))
-        (c/say (c/color :dim "────────────────────────────"))
-        (println "  Title ID:  " (c/color :cyan (or (:title-id item) "—")))
-        (println "  Content ID:" (c/color :dim (or (:content-id item) "—")))
-        (println "  Region:    " (or (:region item) "—"))
-        (println "  Platform:  " (c/color (c/platform-color plat) (name plat))
-                 (c/color :dim (str "(" (name source) ")")))
-        (when (seq size-bytes)
-          (println "  Size:      " (fmt/format-size size-bytes)))
-        (println "  PKG:       "
-                 (if (and pkg-url (not (#{"" "MISSING"} pkg-url)))
-                   (c/color :green "✓ available")
-                   (c/color :red "✗ missing")))
-        (print-license-status plat item)
-        (c/say (c/color :dim "────────────────────────────")))
-      (c/say (c/color :red "invalid number"))))
-  session)
+(defn handle-license-all [{:keys [config] :as session} args]
+  (if (not= ["all"] (mapv str/lower-case args))
+    (result session [[:usage "license all"]])
+    (let [lookup (tsv/build-lookup (:cache_dir config))
+          created (doall
+                   (for [[plat dir] (content-dirs (:output_dir config))
+                         :let [item (get lookup (.getName dir))]
+                         :when (and item (not (has-license? dir)))
+                         :let [out (license/write-license-file item dir)]
+                         :when out]
+                     [plat dir]))]
+      (result session
+              (if (empty? created)
+                [[:license-nothing]]
+                (conj (mapv (fn [[p d]] [:license-created p d]) created)
+                      [:license-summary (count created)]))))))
 
 (defn- ensure-tsv
-  "Ensure the TSV for `content-type` is on disk and return its file, or nil
-   when no URL is configured / download fails."
+  "Make sure the TSV for `content-type` is cached locally.
+   Returns {:file f} on success, {:warn [ct msg]} on failure,
+   or nil when no URL is configured."
   [{:keys [config force-refresh?]} content-type]
   (when-let [url (get-in config [:catalog_urls content-type])]
     (try
-      (tsv/download-tsv {:url url
-                         :cache-file (cache-file-for config content-type)
-                         :expiration-days (:cache_expiration_days config)
-                         :force? force-refresh?})
+      {:file (tsv/download-tsv
+              {:url url
+               :cache-file (cache-file-for config content-type)
+               :expiration-days (:cache_expiration_days config)
+               :force? force-refresh?})}
       (catch Exception e
-        (c/say (c/color :yellow "warning:") "could not load"
-               (color-type content-type) "—" (.getMessage e))
-        nil))))
+        {:warn [content-type (.getMessage e)]}))))
 
-(defn- print-result-row [i row]
-  (let [source (:_source row)
-        plat (p/platform-from-source source)
-        ct (last (str/split (name source) #"_"))]
-    (println (format "  %3d. %s │ %s │ %-40s │ %-4s │ %9s"
-                     (inc i)
-                     (c/color (c/platform-color plat) (name plat))
-                     ct
-                     (or (tsv/display-name row) "")
-                     (or (:region row) "")
-                     (or (fmt/format-size (:file-size row)) "")))))
-
-(defn handle-search
-  "Search across the selected content types' TSVs for `term`.
-   Stores matches in session :last-results and prints a numbered list."
-  [{:keys [selected-types selected-regions] :as session} args]
+(defn handle-search [{:keys [selected-types selected-regions] :as session} args]
   (cond
     (empty? args)
-    (do (println "  usage: search <term>") session)
+    (result session [[:usage "search <term>"]])
 
     (empty? selected-types)
-    (do (c/say (c/color :yellow "no content types selected — use 'select' first"))
-        session)
+    (result session [[:no-types-selected]])
 
     :else
     (let [term (str/join " " args)
-          _ (println "  searching for" (c/color :cyan term) "...")
-          tsvs (keep (fn [ct] (when-let [f (ensure-tsv session ct)] [ct f]))
-                     (sort selected-types))
-          results (search/search-content tsvs term selected-regions)]
+          fetches (map (fn [ct] [ct (ensure-tsv session ct)])
+                       (sort selected-types))
+          warnings (for [[_ {:keys [warn]}] fetches :when warn]
+                     (into [:tsv-warning] warn))
+          tsvs (for [[ct {:keys [file]}] fetches :when file] [ct file])
+          results (search/search-content tsvs term selected-regions)
+          base-events (concat [[:searching term]] warnings)]
       (if (empty? results)
-        (do (c/say (c/color :yellow "no results")) (sess/set-results session []))
-        (do (c/say (c/color :green (str "found " (count results) " result(s):")))
-            (doseq [[i row] (map-indexed vector results)]
-              (print-result-row i row))
-            (sess/set-results session results))))))
+        (result (sess/set-results session [])
+                (concat base-events [[:no-results]]))
+        (result (sess/set-results session results)
+                (concat base-events [[:results results]]))))))

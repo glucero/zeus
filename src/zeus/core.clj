@@ -1,10 +1,10 @@
 (ns zeus.core
   (:require [clojure.string :as str]
             [clojure.tools.cli :as cli]
-            [zeus.colors :as c]
             [zeus.commands :as cmd]
             [zeus.config :as cfg]
-            [zeus.session :as sess]))
+            [zeus.session :as sess]
+            [zeus.view :as view]))
 
 (def cli-options
   [["-c" "--config PATH" "Path to YAML config file"
@@ -44,47 +44,46 @@
    "clear"    (fn [s _] (cmd/handle-clear s))})
 
 (defn dispatch
-  "Run `cmd` against `session`. Returns the updated session,
-   or ::exit when the user asked to quit."
+  "Run `cmd` against `session`. Returns ::exit for exit commands,
+   or {:session ..., :events [...]} from the matched handler."
   [session cmd args]
   (cond
     (exit-commands cmd) ::exit
     :else (if-let [handler (handlers cmd)]
             (handler session args)
-            (do (c/say (c/color :red "unknown command:") cmd
-                       (c/color :dim "(try 'help')"))
-                session))))
+            {:session session :events [[:unknown-command cmd]]})))
 
 (defn- read-and-dispatch [session config-path]
   (print (sess/prompt-str session)) (flush)
   (let [line (read-line)]
     (cond
-      (nil? line)                          ::exit
-      (str/blank? line)                    session
+      (nil? line)       ::exit
+      (str/blank? line) session
       :else
       (let [[cmd & args] (str/split (str/trim line) #"\s+")
-            result (dispatch session cmd args)]
-        (when (and (not= ::exit result) (mutating? cmd))
-          (cfg/save-session config-path
-                            (:selected-types result)
-                            (:selected-regions result)))
-        result))))
+            outcome (dispatch session cmd args)]
+        (if (= ::exit outcome)
+          ::exit
+          (let [{:keys [session events]} outcome]
+            (view/render-all! events)
+            (when (mutating? cmd)
+              (cfg/save-session config-path
+                                (:selected-types session)
+                                (:selected-regions session)))
+            session))))))
 
 (defn run
   "Run the interactive REPL using the config at `config-path`."
   [config-path]
   (let [config (cfg/load-config config-path)]
-    (println)
-    (c/say (c/color :bold "zeus") "— NoPayStation Interactive Browser")
-    (c/say (c/color :dim "type 'help' for commands, 'exit' to quit"))
-    (println)
+    (view/render! [:banner])
     (loop [session (sess/new-session config)]
       (let [next (try (read-and-dispatch session config-path)
                       (catch Exception e
-                        (c/say (c/color :red "error:") (.getMessage e))
+                        (view/render! [:repl-error (.getMessage e)])
                         session))]
         (cond
-          (= ::exit next) (c/say (c/color :dim "👋 goodbye"))
+          (= ::exit next) (view/render! [:goodbye])
           :else (recur next))))))
 
 (defn -main

@@ -13,19 +13,19 @@
 
 (deftest dispatch
   (let [session (sess/new-session {})]
-    (testing "unknown commands print an error and return session"
-      (let [out (with-out-str (core/dispatch session "frobnicate" []))]
-        (is (re-find #"(?i)unknown" out))))
+    (testing "unknown commands return an :unknown-command event"
+      (let [out (core/dispatch session "frobnicate" [])]
+        (is (= [[:unknown-command "frobnicate"]] (:events out)))
+        (is (= session (:session out)))))
     (testing "exit / quit return ::core/exit"
-      (is (= ::core/exit (binding [*out* (java.io.StringWriter.)]
-                           (core/dispatch session "exit" []))))
-      (is (= ::core/exit (binding [*out* (java.io.StringWriter.)]
-                           (core/dispatch session "quit" [])))))
+      (is (= ::core/exit (core/dispatch session "exit" [])))
+      (is (= ::core/exit (core/dispatch session "quit" []))))
     (testing "known command routes to its handler"
       (let [called (atom nil)]
-        (with-redefs [cmd/handle-status (fn [s] (reset! called :status) s)]
-          (binding [*out* (java.io.StringWriter.)]
-            (core/dispatch session "status" []))
+        (with-redefs [cmd/handle-status (fn [s]
+                                          (reset! called :status)
+                                          {:session s :events []})]
+          (core/dispatch session "status" [])
           (is (= :status @called)))))))
 
 (deftest mutating?
